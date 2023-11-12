@@ -1,62 +1,24 @@
-pub struct Sand;
-impl BasicPixel for Sand {
-    fn pixel_type(&self) -> PixelType {
-        PixelType::Solid(50)
-    }
-}
-pub struct Rock;
-impl BasicPixel for Rock {
-    fn pixel_type(&self) -> PixelType {
-        PixelType::Wall
-    }
-}
-pub struct Water;
-impl BasicPixel for Water {
-    fn pixel_type(&self) -> PixelType {
-        PixelType::Liquid(10)
-    }
-}
-pub struct Void;
-impl BasicPixel for Void {
-    fn pixel_type(&self) -> PixelType {
-        PixelType::Void
-    }
-}
+pub mod rock;
+pub mod sand;
+pub mod steam;
+pub mod void;
+pub mod water;
 
-pub struct Steam;
-impl BasicPixel for Steam {
-    fn pixel_type(&self) -> PixelType {
-        PixelType::Gas(-10)
-    }
-}
-
-pub enum Pixel {
-    Steam(Steam),
-    Sand(Sand),
-    Rock(Rock),
-    Water(Water),
-    Void(Void),
-}
-
-impl BasicPixel for Pixel {
-    fn pixel_type(&self) -> PixelType {
-        match self {
-            Pixel::Steam(val) => val.pixel_type(),
-            Pixel::Sand(val) => val.pixel_type(),
-            Pixel::Rock(val) => val.pixel_type(),
-            Pixel::Water(val) => val.pixel_type(),
-            Pixel::Void(val) => val.pixel_type(),
-        }
-    }
-}
+use crate::engine::pixel::rock::Rock;
+use crate::engine::pixel::sand::Sand;
+use crate::engine::pixel::steam::Steam;
+use crate::engine::pixel::void::Void;
+use crate::engine::pixel::water::Water;
+use std::fmt::{Display, Formatter};
 
 /// Holds the type and density of a pixel
+#[derive(Debug, Eq, PartialEq)]
 pub enum PixelType {
-    /// Gas may move in any direction
+    /// Gas may move in any direction randomly
     Gas(i8),
-    /// Liquid moves down, if it can't it moves left or right
+    /// Liquid moves down, down left, down right, left, or right
     Liquid(i8),
-    /// Solid moves down
+    /// Solid moves down, down left, or down right
     Solid(i8),
     /// Wall doesn't move
     Wall,
@@ -106,6 +68,10 @@ pub struct AdjacentPixels<'a> {
 }
 
 pub trait BasicPixel {
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
     fn pixel_type(&self) -> PixelType;
 
     fn tick_move(&self, adjacent_pixels: &AdjacentPixels) -> Option<Direction> {
@@ -199,5 +165,76 @@ pub trait BasicPixel {
             }
             PixelType::Wall | PixelType::Void => None,
         }
+    }
+}
+
+#[macro_export]
+macro_rules! implement_basic_pixel {
+    ($type_name:ty,$pixel_type:expr, $pixel_pat:path) => {
+        impl BasicPixel for $type_name {
+            fn pixel_type(&self) -> PixelType {
+                $pixel_type
+            }
+        }
+
+        impl From<$type_name> for Pixel {
+            fn from(val: $type_name) -> Self {
+                $pixel_pat(val)
+            }
+        }
+
+        impl TryFrom<Pixel> for $type_name {
+            type Error = anyhow::Error;
+
+            fn try_from(value: Pixel) -> Result<Self, Self::Error> {
+                match value {
+                    $pixel_pat(val) => Ok(val),
+                    _ => Err(anyhow!("{} is not a Pixel", value)),
+                }
+            }
+        }
+    };
+}
+
+#[derive(Debug, Clone)]
+pub enum Pixel {
+    Steam(Steam),
+    Sand(Sand),
+    Rock(Rock),
+    Water(Water),
+    Void(Void),
+}
+
+impl Default for Pixel {
+    fn default() -> Self {
+        Self::Void(Void)
+    }
+}
+
+impl BasicPixel for Pixel {
+    fn name(&self) -> &'static str {
+        match self {
+            Pixel::Steam(val) => val.name(),
+            Pixel::Sand(val) => val.name(),
+            Pixel::Rock(val) => val.name(),
+            Pixel::Water(val) => val.name(),
+            Pixel::Void(val) => val.name(),
+        }
+    }
+
+    fn pixel_type(&self) -> PixelType {
+        match self {
+            Pixel::Steam(val) => val.pixel_type(),
+            Pixel::Sand(val) => val.pixel_type(),
+            Pixel::Rock(val) => val.pixel_type(),
+            Pixel::Water(val) => val.pixel_type(),
+            Pixel::Void(val) => val.pixel_type(),
+        }
+    }
+}
+
+impl Display for Pixel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
     }
 }

@@ -1,5 +1,6 @@
-use crate::domain::pixel::{AdjacentPixels, Pixel};
+use crate::engine::pixel::{AdjacentPixels, BasicPixel, Pixel, PixelType};
 
+#[derive(Debug)]
 pub struct Sandbox {
     pub width: usize,
     pub height: usize,
@@ -7,6 +8,14 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
+    pub fn new(width: usize, height: usize) -> Self {
+        Self {
+            width,
+            height,
+            pixels: vec![Pixel::default(); width * height],
+        }
+    }
+
     pub fn coordinates_to_index(&self, x: usize, y: usize) -> usize {
         x + y * self.width
     }
@@ -89,6 +98,23 @@ impl Sandbox {
             top_right,
             bottom_left,
             bottom_right,
+        }
+    }
+
+    pub fn place_pixel(&mut self, pixel: Pixel, x: usize, y: usize) {
+        let index = self.coordinates_to_index(x, y);
+        if let Some(p) = self.pixels.get_mut(index) {
+            if p.pixel_type() != PixelType::Void {
+                return;
+            }
+            *p = pixel;
+        }
+    }
+
+    pub fn place_pixel_force(&mut self, pixel: Pixel, x: usize, y: usize) {
+        let index = self.coordinates_to_index(x, y);
+        if let Some(p) = self.pixels.get_mut(index) {
+            *p = pixel;
         }
     }
 }
