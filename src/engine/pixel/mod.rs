@@ -196,7 +196,7 @@ macro_rules! implement_basic_pixel {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Pixel {
     Steam(Steam),
     Sand(Sand),

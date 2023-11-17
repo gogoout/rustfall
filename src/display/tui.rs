@@ -8,7 +8,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
 use crate::display::event::EventHandler;
-use crate::display::render;
+use crate::display::render::Renderer;
 use crate::display::state::State;
 
 pub type CrosstermTerminal = Terminal<CrosstermBackend<io::Stderr>>;
@@ -22,17 +22,29 @@ pub struct Tui {
     terminal: CrosstermTerminal,
     /// Terminal event handler.
     pub events: EventHandler,
+    renderer: Renderer,
+    state: State,
 }
 
 impl Tui {
     /// Constructs a new instance of [`Tui`].
-    pub fn try_new() -> anyhow::Result<Self> {
+    pub fn try_new(no_braille: bool) -> anyhow::Result<Self> {
         let backend = CrosstermBackend::new(io::stderr());
 
         let terminal = Terminal::new(backend)?;
         let events = EventHandler::new(16);
+        let renderer = Renderer::new(no_braille);
 
-        Ok(Self { terminal, events })
+        let rect = terminal.size()?;
+        let (width, height) = renderer.sandbox_size(rect);
+        let state = State::new(width, height, no_braille);
+
+        Ok(Self {
+            terminal,
+            events,
+            renderer,
+            state,
+        })
     }
 
     /// Initializes the terminal interface.
@@ -55,12 +67,22 @@ impl Tui {
         Ok(())
     }
 
+    pub fn run(&mut self) -> anyhow::Result<()> {
+        while !self.state.should_quit {
+            self.draw()?;
+            self.state.update(self.events.next()?);
+        }
+
+        Ok(())
+    }
+
     /// [`Draw`] the terminal interface by [`rendering`] the widgets.
     ///
     /// [`Draw`]: tui::Terminal::draw
     /// [`rendering`]: crate::ui:render
-    pub fn draw(&mut self, state: &mut State) -> anyhow::Result<()> {
-        self.terminal.draw(|frame| render::render(state, frame))?;
+    pub fn draw(&mut self) -> anyhow::Result<()> {
+        self.terminal
+            .draw(|frame| self.renderer.render(&self.state, frame))?;
         Ok(())
     }
 
@@ -72,12 +94,6 @@ impl Tui {
         terminal::disable_raw_mode()?;
         crossterm::execute!(io::stderr(), LeaveAlternateScreen, DisableMouseCapture)?;
         Ok(())
-    }
-
-    pub fn size(&self) -> anyhow::Result<(usize, usize)> {
-        let rect = self.terminal.size()?;
-
-        Ok((rect.width as usize, rect.height as usize))
     }
 
     /// Exits the terminal interface.

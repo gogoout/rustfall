@@ -5,17 +5,9 @@ mod display;
 pub mod engine;
 
 fn main() -> anyhow::Result<()> {
-    let mut tui = Tui::try_new()?;
+    let mut tui = Tui::try_new(false)?;
     tui.enter()?;
-
-    let (width, height) = tui.size()?;
-    let mut state = State::new(width, height);
-
-    while !state.should_quit {
-        tui.draw(&mut state)?;
-        state.update(tui.events.next()?);
-    }
-
+    tui.run()?;
     tui.exit()?;
     Ok(())
 }
