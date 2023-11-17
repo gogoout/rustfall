@@ -1,12 +1,9 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use strum::IntoEnumIterator;
+
 use crate::display::event::Event;
-use crate::engine::pixel::rock::Rock;
-use crate::engine::pixel::sand::Sand;
-use crate::engine::pixel::steam::Steam;
-use crate::engine::pixel::void::Void;
-use crate::engine::pixel::water::Water;
 use crate::engine::pixel::Pixel;
 use crate::engine::sandbox::Sandbox;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 
 /// Application.
 #[derive(Debug)]
@@ -61,14 +58,11 @@ impl State {
         match e.code {
             KeyCode::Char('c') if e.modifiers == KeyModifiers::CONTROL => self.quit(),
             KeyCode::Char(' ') => self.pause = !self.pause,
-            KeyCode::Char(c) => match c {
-                '1' => self.active_pixel = Sand.into(),
-                '2' => self.active_pixel = Rock.into(),
-                '3' => self.active_pixel = Water.into(),
-                '4' => self.active_pixel = Steam.into(),
-                '0' => self.active_pixel = Void.into(),
-                _ => {}
-            },
+            KeyCode::Char(c) => {
+                if let Some(pixel) = Pixel::iter().find(|pixel| pixel.hotkey() == c) {
+                    self.active_pixel = pixel;
+                }
+            }
             _ => {}
         }
     }
@@ -93,6 +87,7 @@ impl State {
             false => {
                 let x = e.column as usize * 2;
                 let y = e.row as usize * 4;
+
                 for i in 0..2 {
                     for j in 0..4 {
                         self.place_pixel(x + i, y + j);
@@ -104,11 +99,31 @@ impl State {
     }
 
     fn place_pixel(&mut self, x: usize, y: usize) {
+        if x > self.sandbox.width - 1 || y > self.sandbox.height - 1 {
+            return;
+        }
+
         match self.active_pixel {
             Pixel::Void(_) => self
                 .sandbox
                 .place_pixel_force(self.active_pixel.clone(), x, y),
             _ => self.sandbox.place_pixel(self.active_pixel.clone(), x, y),
+        }
+    }
+}
+
+pub trait PixelHotkey {
+    fn hotkey(&self) -> char;
+}
+
+impl PixelHotkey for Pixel {
+    fn hotkey(&self) -> char {
+        match self {
+            Pixel::Sand(_) => '1',
+            Pixel::Water(_) => '2',
+            Pixel::Rock(_) => '3',
+            Pixel::Steam(_) => '4',
+            Pixel::Void(_) => '0',
         }
     }
 }

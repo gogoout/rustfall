@@ -68,9 +68,7 @@ pub struct AdjacentPixels<'a> {
 }
 
 pub trait BasicPixel {
-    fn name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
+    fn name(&self) -> &'static str;
 
     fn pixel_type(&self) -> PixelType;
 
@@ -172,6 +170,10 @@ pub trait BasicPixel {
 macro_rules! implement_basic_pixel {
     ($type_name:ty,$pixel_type:expr, $pixel_pat:path) => {
         impl BasicPixel for $type_name {
+            fn name(&self) -> &'static str {
+                stringify!($type_name)
+            }
+
             fn pixel_type(&self) -> PixelType {
                 $pixel_type
             }
@@ -196,7 +198,7 @@ macro_rules! implement_basic_pixel {
     };
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::EnumIter)]
 pub enum Pixel {
     Steam(Steam),
     Sand(Sand),
