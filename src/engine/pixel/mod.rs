@@ -9,7 +9,9 @@ use crate::engine::pixel::sand::Sand;
 use crate::engine::pixel::steam::Steam;
 use crate::engine::pixel::void::Void;
 use crate::engine::pixel::water::Water;
+use rand::Rng;
 use std::fmt::{Display, Formatter};
+use std::sync::OnceLock;
 
 /// Holds the type and density of a pixel
 #[derive(Debug, Eq, PartialEq)]
@@ -38,33 +40,54 @@ pub enum Direction {
     DownRight,
 }
 
-impl Direction {
-    pub fn shuffled_slice() -> [Direction; 8] {
-        use rand::seq::SliceRandom;
-        let mut directions = [
-            Direction::Up,
-            Direction::Down,
-            Direction::Left,
-            Direction::Right,
-            Direction::UpLeft,
-            Direction::UpRight,
-            Direction::DownLeft,
-            Direction::DownRight,
-        ];
-        directions.shuffle(&mut rand::thread_rng());
-        directions
+pub struct RandNum(usize);
+impl RandNum {
+    pub fn get_num(&mut self) -> usize {
+        self.0 += 1;
+        self.0
     }
 }
 
-pub struct AdjacentPixels<'a> {
-    pub top: Option<&'a Pixel>,
-    pub bottom: Option<&'a Pixel>,
-    pub left: Option<&'a Pixel>,
-    pub right: Option<&'a Pixel>,
-    pub top_left: Option<&'a Pixel>,
-    pub top_right: Option<&'a Pixel>,
-    pub bottom_left: Option<&'a Pixel>,
-    pub bottom_right: Option<&'a Pixel>,
+impl Direction {
+    pub fn shuffled_slice<R: Rng>(mut rng: R) -> [Direction; 8] {
+        const MAX_SHUFFLES: usize = 1000;
+
+        static ALL_SHUFFLED_LOCK: OnceLock<Vec<[Direction; 8]>> = OnceLock::new();
+        let v = ALL_SHUFFLED_LOCK.get_or_init(|| {
+            let mut all_shuffled = Vec::with_capacity(MAX_SHUFFLES);
+
+            for _ in 0..MAX_SHUFFLES {
+                use rand::seq::SliceRandom;
+                let mut directions = [
+                    Direction::Up,
+                    Direction::Down,
+                    Direction::Left,
+                    Direction::Right,
+                    Direction::UpLeft,
+                    Direction::UpRight,
+                    Direction::DownLeft,
+                    Direction::DownRight,
+                ];
+                directions.shuffle(&mut rng);
+                all_shuffled.push(directions);
+            }
+            all_shuffled
+        });
+
+        let idx = rng.gen_range(0..MAX_SHUFFLES);
+        v[idx]
+    }
+}
+
+pub struct AdjacentPixels {
+    pub top: Option<Pixel>,
+    pub bottom: Option<Pixel>,
+    pub left: Option<Pixel>,
+    pub right: Option<Pixel>,
+    pub top_left: Option<Pixel>,
+    pub top_right: Option<Pixel>,
+    pub bottom_left: Option<Pixel>,
+    pub bottom_right: Option<Pixel>,
 }
 
 pub trait BasicPixel {
@@ -72,8 +95,8 @@ pub trait BasicPixel {
 
     fn pixel_type(&self) -> PixelType;
 
-    fn tick_move(&self, adjacent_pixels: &AdjacentPixels) -> Option<Direction> {
-        let check_density = |density, target: &Option<&Pixel>, dir: Direction, reverse: bool| {
+    fn tick_move<R: Rng>(&self, adjacent_pixels: &AdjacentPixels, rng: R) -> Option<Direction> {
+        let check_density = |density, target: &Option<Pixel>, dir: Direction, reverse: bool| {
             target.and_then(|target| match target.pixel_type() {
                 PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
                     match (density == td, density > td, reverse) {
@@ -90,7 +113,7 @@ pub trait BasicPixel {
 
         match self.pixel_type() {
             PixelType::Gas(density) => {
-                Direction::shuffled_slice()
+                Direction::shuffled_slice(rng)
                     .iter()
                     .find_map(|dir| match dir {
                         Direction::Up => check_density(density, &adjacent_pixels.top, *dir, true),
@@ -198,7 +221,7 @@ macro_rules! implement_basic_pixel {
     };
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, strum_macros::EnumIter)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, strum_macros::EnumIter)]
 pub enum Pixel {
     Steam(Steam),
     Sand(Sand),

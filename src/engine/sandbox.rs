@@ -1,4 +1,5 @@
 use crate::engine::pixel::{AdjacentPixels, BasicPixel, Direction, Pixel, PixelType};
+use rand::SeedableRng;
 
 #[derive(Debug, Default, Clone)]
 pub struct PixelContainer {
@@ -14,8 +15,8 @@ impl PixelContainer {
         }
     }
 
-    pub fn pixel(&self) -> &Pixel {
-        &self.pixel
+    pub fn pixel(&self) -> Pixel {
+        self.pixel
     }
 
     pub fn mark_is_moved(&mut self, flag: bool) {
@@ -28,6 +29,7 @@ pub struct Sandbox {
     pub width: usize,
     pub height: usize,
     pub pixels: Vec<PixelContainer>,
+    rng: rand::rngs::SmallRng,
 }
 
 impl Sandbox {
@@ -36,6 +38,7 @@ impl Sandbox {
             width,
             height,
             pixels: vec![PixelContainer::default(); width * height],
+            rng: rand::rngs::SmallRng::from_entropy(),
         }
     }
 
@@ -172,7 +175,7 @@ impl Sandbox {
 
             let adjacent_pixels = self.get_adjacent_pixel_index(idx);
 
-            if let Some(dir) = pixel.pixel().tick_move(&adjacent_pixels) {
+            if let Some(dir) = pixel.pixel().tick_move(&adjacent_pixels, &mut self.rng) {
                 let (x, y) = self.index_to_coordinates(idx);
 
                 let new_index = match dir {
