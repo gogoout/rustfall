@@ -83,10 +83,17 @@ impl State {
         let Some(e) = self.mouse_down_event.as_ref() else {
             return;
         };
+        if e.row == 0 || e.column == 0 {
+            return;
+        }
+        // need to offset by the border
+        let x = e.column as usize - 1;
+        let y = e.row as usize - 1;
+
         match self.no_braille {
             false => {
-                let x = e.column as usize * 2;
-                let y = e.row as usize * 4;
+                let x = x * 2;
+                let y = y * 4;
 
                 for i in 0..2 {
                     for j in 0..4 {
@@ -94,7 +101,7 @@ impl State {
                     }
                 }
             }
-            true => self.place_pixel(e.column as usize, e.row as usize),
+            true => self.place_pixel(x, y),
         }
     }
 

@@ -1,4 +1,3 @@
-use crate::display::state::State;
 use crate::display::tui::Tui;
 
 mod display;

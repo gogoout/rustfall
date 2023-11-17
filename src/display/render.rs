@@ -1,16 +1,17 @@
+use std::sync::OnceLock;
+
 use itertools::Itertools;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Marker;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::canvas::{Canvas, Painter, Shape};
-use ratatui::widgets::{BorderType, List, ListItem, ListState};
+use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::{
     prelude::Frame,
     style::Color,
     symbols,
     widgets::{Block, Borders},
 };
-use std::sync::OnceLock;
 use strum::IntoEnumIterator;
 
 use crate::display::state::{PixelHotkey, State};
@@ -63,7 +64,7 @@ impl Renderer {
                 )
                 .marker(match self.no_braille {
                     false => Marker::Braille,
-                    true => Marker::Dot,
+                    true => Marker::Block,
                 })
                 .paint(|ctx| {
                     ctx.draw(&state.sandbox);
@@ -137,11 +138,11 @@ impl PixelDisplay for Pixel {
 impl Shape for Sandbox {
     fn draw(&self, painter: &mut Painter) {
         for (idx, pixel) in self.pixels.iter().enumerate() {
-            if let Pixel::Void(_) = pixel {
+            if let Pixel::Void(_) = pixel.pixel() {
                 continue;
             }
             let (x, y) = self.index_to_coordinates(idx);
-            painter.paint(x, y, pixel.display());
+            painter.paint(x, y, pixel.pixel().display());
         }
     }
 }
