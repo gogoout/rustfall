@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.75"
 crossterm = "0.27.0"
 itertools = "0.12.0"
+rand = { version = "0.8.5", features = ["small_rng"] }
 ratatui = "0.24.0"
 strum = "0.25.0"
 strum_macros = "0.25.3"

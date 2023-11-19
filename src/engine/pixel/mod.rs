@@ -10,10 +10,16 @@ use crate::engine::pixel::steam::Steam;
 use crate::engine::pixel::void::Void;
 use crate::engine::pixel::water::Water;
 use crate::engine::sandbox::Sandbox;
+use itertools::Itertools;
+use rand::distributions::Distribution;
+use rand::distributions::Uniform;
+use rand::Rng;
 use std::fmt::{Display, Formatter};
+use std::sync::OnceLock;
 
 /// Holds the type and density of a pixel
 #[derive(Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum PixelType {
     /// Gas may move in any direction randomly
     Gas(i8),
@@ -28,6 +34,7 @@ pub enum PixelType {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 pub enum Direction {
     Up,
     Down,
@@ -39,11 +46,80 @@ pub enum Direction {
     DownRight,
 }
 
-pub struct RandNum(usize);
-impl RandNum {
-    pub fn get_num(&mut self) -> usize {
-        self.0 += 1;
-        self.0
+impl Direction {
+    pub fn gas_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
+        static DIRECTIONS: OnceLock<Vec<[Direction; 5]>> = OnceLock::new();
+        let v = DIRECTIONS.get_or_init(|| {
+            let v = vec![
+                [Direction::Up, Direction::UpLeft, Direction::UpRight],
+                [Direction::Up, Direction::UpRight, Direction::UpLeft],
+                [Direction::UpLeft, Direction::UpRight, Direction::Up],
+                [Direction::UpLeft, Direction::Up, Direction::UpRight],
+                [Direction::UpRight, Direction::UpLeft, Direction::Up],
+                [Direction::UpRight, Direction::Up, Direction::UpLeft],
+            ];
+
+            v.into_iter()
+                .flat_map(|arr| {
+                    [
+                        [arr[0], arr[1], arr[2], Direction::Left, Direction::Right],
+                        [arr[0], arr[1], arr[2], Direction::Right, Direction::Left],
+                    ]
+                })
+                .collect::<Vec<_>>()
+        });
+
+        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
+        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
+
+        let idx = between.sample(rng);
+        v[idx].as_ref()
+    }
+    pub fn liquid_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
+        static DIRECTIONS: OnceLock<Vec<[Direction; 5]>> = OnceLock::new();
+        let v = DIRECTIONS.get_or_init(|| {
+            let v1 = vec![
+                [Direction::DownLeft, Direction::DownRight],
+                [Direction::DownRight, Direction::DownLeft],
+            ];
+            let v2 = vec![
+                [Direction::Left, Direction::Right],
+                [Direction::Right, Direction::Left],
+            ];
+
+            v1.into_iter()
+                .flat_map(|v1| {
+                    v2.iter()
+                        .map(|v2| [Direction::Down, v1[0], v1[1], v2[0], v2[1]])
+                        .collect_vec()
+                })
+                .collect::<Vec<_>>()
+        });
+
+        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
+        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
+
+        let idx = between.sample(rng);
+        v[idx].as_ref()
+    }
+    pub fn solid_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
+        static DIRECTIONS: OnceLock<Vec<[Direction; 3]>> = OnceLock::new();
+        let v = DIRECTIONS.get_or_init(|| {
+            let v = vec![
+                [Direction::DownLeft, Direction::DownRight],
+                [Direction::DownRight, Direction::DownLeft],
+            ];
+
+            v.into_iter()
+                .map(|v| [Direction::Down, v[0], v[1]])
+                .collect::<Vec<_>>()
+        });
+
+        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
+        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
+
+        let idx = between.sample(rng);
+        v[idx].as_ref()
     }
 }
 
@@ -52,8 +128,8 @@ pub trait BasicPixel {
 
     fn pixel_type(&self) -> PixelType;
 
-    fn tick_move(&self, x: usize, y: usize, sandbox: &Sandbox) -> Option<Direction> {
-        let check_density = |density, dir: Direction, reverse: bool| {
+    fn tick_move(&self, x: usize, y: usize, sandbox: &mut Sandbox) -> Option<Direction> {
+        let check_density = |sandbox: &Sandbox, density, dir: Direction, reverse: bool| {
             sandbox
                 .get_pixel_neighbour(x, y, dir)
                 .and_then(|target| match target.pixel_type() {
@@ -71,19 +147,15 @@ pub trait BasicPixel {
         };
 
         match self.pixel_type() {
-            PixelType::Gas(density) => check_density(density, Direction::Up, true)
-                .or_else(|| check_density(density, Direction::UpRight, true))
-                .or_else(|| check_density(density, Direction::UpLeft, true))
-                .or_else(|| check_density(density, Direction::Right, true))
-                .or_else(|| check_density(density, Direction::Left, true)),
-            PixelType::Liquid(density) => check_density(density, Direction::Down, false)
-                .or_else(|| check_density(density, Direction::DownLeft, false))
-                .or_else(|| check_density(density, Direction::DownRight, false))
-                .or_else(|| check_density(density, Direction::Left, false))
-                .or_else(|| check_density(density, Direction::Right, false)),
-            PixelType::Solid(density) => check_density(density, Direction::Down, false)
-                .or_else(|| check_density(density, Direction::DownLeft, false))
-                .or_else(|| check_density(density, Direction::DownRight, false)),
+            PixelType::Gas(density) => Direction::gas_directions(&mut sandbox.rng)
+                .iter()
+                .find_map(|dir| check_density(sandbox, density, *dir, true)),
+            PixelType::Liquid(density) => Direction::liquid_directions(&mut sandbox.rng)
+                .iter()
+                .find_map(|dir| check_density(sandbox, density, *dir, false)),
+            PixelType::Solid(density) => Direction::solid_directions(&mut sandbox.rng)
+                .iter()
+                .find_map(|dir| check_density(sandbox, density, *dir, false)),
             PixelType::Wall | PixelType::Void => None,
         }
     }
@@ -122,6 +194,7 @@ macro_rules! implement_basic_pixel {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, strum_macros::EnumIter)]
+#[repr(u8)]
 pub enum Pixel {
     Steam(Steam),
     Sand(Sand),
