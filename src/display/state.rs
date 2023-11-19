@@ -147,6 +147,8 @@ impl PixelHotkey for Pixel {
             Pixel::Water(_) => '2',
             Pixel::Rock(_) => '3',
             Pixel::Steam(_) => '4',
+            Pixel::Fire(_) => '5',
+            Pixel::Wood(_) => '6',
             Pixel::Void(_) => '0',
         }
     }

@@ -1,15 +1,20 @@
+pub mod fire;
 pub mod rock;
 pub mod sand;
 pub mod steam;
 pub mod void;
 pub mod water;
+pub mod wood;
 
+use crate::engine::pixel::fire::Fire;
 use crate::engine::pixel::rock::Rock;
 use crate::engine::pixel::sand::Sand;
 use crate::engine::pixel::steam::Steam;
 use crate::engine::pixel::void::Void;
 use crate::engine::pixel::water::Water;
+use crate::engine::pixel::wood::Wood;
 use crate::engine::sandbox::Sandbox;
+use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
 use rand::distributions::Distribution;
 use rand::distributions::Uniform;
@@ -21,7 +26,7 @@ use std::sync::OnceLock;
 #[derive(Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum PixelType {
-    /// Gas may move in any direction randomly
+    /// Gas may move to top randomly
     Gas(i8),
     /// Liquid moves down, down left, down right, left, or right
     Liquid(i8),
@@ -123,16 +128,25 @@ impl Direction {
     }
 }
 
-pub trait BasicPixel {
+#[enum_dispatch]
+pub trait PixelFundamental {
     fn name(&self) -> &'static str;
 
     fn pixel_type(&self) -> PixelType;
+
+    fn update(&mut self) -> Option<Pixel> {
+        None
+    }
 
     fn tick_move(&self, x: usize, y: usize, sandbox: &mut Sandbox) -> Option<Direction> {
         let check_density = |sandbox: &Sandbox, density, dir: Direction, reverse: bool| {
             sandbox
                 .get_neighbour_pixel(x, y, dir)
-                .and_then(|target| match target.pixel_type() {
+                .and_then(|target| match target.is_moved() {
+                    true => None,
+                    false => Some(target.pixel().pixel_type()),
+                })
+                .and_then(|t| match t {
                     PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
                         match (density == td, density > td, reverse) {
                             (true, _, _) => None,
@@ -161,73 +175,27 @@ pub trait BasicPixel {
     }
 }
 
-#[macro_export]
-macro_rules! implement_basic_pixel {
-    ($type_name:ty,$pixel_type:expr, $pixel_pat:path) => {
-        impl BasicPixel for $type_name {
-            fn name(&self) -> &'static str {
-                stringify!($type_name)
-            }
-
-            fn pixel_type(&self) -> PixelType {
-                $pixel_type
-            }
-        }
-
-        impl From<$type_name> for Pixel {
-            fn from(val: $type_name) -> Self {
-                $pixel_pat(val)
-            }
-        }
-
-        impl TryFrom<Pixel> for $type_name {
-            type Error = anyhow::Error;
-
-            fn try_from(value: Pixel) -> Result<Self, Self::Error> {
-                match value {
-                    $pixel_pat(val) => Ok(val),
-                    _ => Err(anyhow!("{} is not a Pixel", value)),
-                }
-            }
-        }
-    };
+#[enum_dispatch]
+pub trait PixelInteract {
+    fn interact(&mut self, _target: Pixel) {}
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, strum_macros::EnumIter)]
 #[repr(u8)]
+#[enum_dispatch(PixelInteract, PixelFundamental)]
 pub enum Pixel {
     Steam(Steam),
     Sand(Sand),
     Rock(Rock),
     Water(Water),
+    Fire(Fire),
+    Wood(Wood),
     Void(Void),
 }
 
 impl Default for Pixel {
     fn default() -> Self {
         Self::Void(Void)
-    }
-}
-
-impl BasicPixel for Pixel {
-    fn name(&self) -> &'static str {
-        match self {
-            Pixel::Steam(val) => val.name(),
-            Pixel::Sand(val) => val.name(),
-            Pixel::Rock(val) => val.name(),
-            Pixel::Water(val) => val.name(),
-            Pixel::Void(val) => val.name(),
-        }
-    }
-
-    fn pixel_type(&self) -> PixelType {
-        match self {
-            Pixel::Steam(val) => val.pixel_type(),
-            Pixel::Sand(val) => val.pixel_type(),
-            Pixel::Rock(val) => val.pixel_type(),
-            Pixel::Water(val) => val.pixel_type(),
-            Pixel::Void(val) => val.pixel_type(),
-        }
     }
 }
 

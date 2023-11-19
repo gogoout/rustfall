@@ -16,7 +16,7 @@ use ratatui::{
 use strum::IntoEnumIterator;
 
 use crate::display::state::{PixelHotkey, State};
-use crate::engine::pixel::{BasicPixel, Pixel};
+use crate::engine::pixel::{Pixel, PixelFundamental};
 use crate::engine::sandbox::Sandbox;
 
 pub struct Renderer {
@@ -35,13 +35,7 @@ impl Renderer {
         CELL.get_or_init(|| {
             Pixel::iter()
                 .sorted_by_key(|pixel| pixel.hotkey())
-                .map(|pixel| {
-                    ListItem::new(format!(
-                        "[{}]{}",
-                        pixel.hotkey(),
-                        PixelDisplay::name(&pixel)
-                    ))
-                })
+                .map(|pixel| ListItem::new(format!("[{}]{}", pixel.hotkey(), pixel.name())))
                 .collect::<Vec<_>>()
         })
     }
@@ -123,7 +117,6 @@ impl Renderer {
 
 pub trait PixelDisplay {
     fn display(&self) -> Color;
-    fn name(&self) -> &'static str;
 }
 
 impl PixelDisplay for Pixel {
@@ -132,16 +125,20 @@ impl PixelDisplay for Pixel {
             // light blue
             Pixel::Steam(_) => Color::Indexed(69),
             // darker yellow
-            Pixel::Sand(_) => Color::LightYellow,
+            Pixel::Sand(_) => Color::Indexed(214),
             // grey
             Pixel::Rock(_) => Color::Indexed(254),
             Pixel::Water(_) => Color::Blue,
             Pixel::Void(_) => Color::Black,
+            Pixel::Fire(_) => Color::Red,
+            Pixel::Wood(val) => {
+                if val.is_burning() {
+                    Color::Indexed(202)
+                } else {
+                    Color::Yellow
+                }
+            }
         }
-    }
-
-    fn name(&self) -> &'static str {
-        BasicPixel::name(self)
     }
 }
 

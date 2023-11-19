@@ -1,8 +1,16 @@
-use crate::engine::pixel::{BasicPixel, Pixel, PixelType};
-use crate::implement_basic_pixel;
-use anyhow::anyhow;
+use crate::engine::pixel::{PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct Rock;
 
-implement_basic_pixel!(Rock, PixelType::Wall, Pixel::Rock);
+impl PixelFundamental for Rock {
+    fn name(&self) -> &'static str {
+        "Rock"
+    }
+
+    fn pixel_type(&self) -> PixelType {
+        PixelType::Wall
+    }
+}
+
+impl PixelInteract for Rock {}

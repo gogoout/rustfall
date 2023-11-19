@@ -1,4 +1,4 @@
-use crate::engine::pixel::{BasicPixel, Direction, Pixel, PixelType};
+use crate::engine::pixel::{Direction, Pixel, PixelFundamental, PixelInteract, PixelType};
 use std::time;
 
 #[derive(Debug, Default, Clone)]
@@ -17,6 +17,12 @@ impl PixelContainer {
 
     pub fn pixel(&self) -> Pixel {
         self.pixel
+    }
+    pub fn pixel_mut(&mut self) -> &mut Pixel {
+        &mut self.pixel
+    }
+    pub fn is_moved(&self) -> bool {
+        self.is_moved
     }
 
     pub fn mark_is_moved(&mut self, flag: bool) {
@@ -76,21 +82,16 @@ impl Sandbox {
         }
     }
 
-    pub fn get_neighbour_pixel(&self, x: usize, y: usize, dir: Direction) -> Option<Pixel> {
-        let get_pixel = |index| {
-            self.pixels
-                .get(index)
-                .and_then(|c: &PixelContainer| match c.is_moved {
-                    true => None,
-                    false => Some(c),
-                })
-                .map(|c| c.pixel())
-        };
-
+    pub fn get_neighbour_pixel(
+        &self,
+        x: usize,
+        y: usize,
+        dir: Direction,
+    ) -> Option<&PixelContainer> {
         let (x, y) = self.get_neighbour_coordinates(x, y, dir);
         match self.is_coordinate_in_bound(x, y) {
             false => None,
-            true => get_pixel(self.coordinates_to_index(x, y)),
+            true => self.pixels.get(self.coordinates_to_index(x, y)),
         }
     }
     pub fn place_pixel(&mut self, pixel: Pixel, x: usize, y: usize) {
@@ -161,6 +162,39 @@ impl Sandbox {
             idx -= 1;
         }
 
+        let mut idx = self.pixels.len() - 1;
+
+        loop {
+            if idx == 0 {
+                break;
+            }
+            let (x, y) = self.index_to_coordinates(idx);
+
+            let neighbour = [
+                self.get_neighbour_pixel(x, y, Direction::Up)
+                    .map(|c| c.pixel()),
+                self.get_neighbour_pixel(x, y, Direction::Down)
+                    .map(|c| c.pixel()),
+                self.get_neighbour_pixel(x, y, Direction::Left)
+                    .map(|c| c.pixel()),
+                self.get_neighbour_pixel(x, y, Direction::Right)
+                    .map(|c| c.pixel()),
+            ];
+
+            let pixel = self.pixels.get_mut(idx).unwrap();
+            neighbour.into_iter().for_each(|t| {
+                if let Some(target) = t {
+                    pixel.pixel_mut().interact(target);
+                }
+            });
+
+            if let Some(new_pixel) = PixelFundamental::update(pixel.pixel_mut()) {
+                pixel.pixel = new_pixel;
+            }
+
+            idx -= 1;
+        }
+
         self.pixels.iter_mut().for_each(|p| p.mark_is_moved(false));
         self.track_fps();
     }
@@ -214,7 +248,7 @@ mod test {
         // create a sandbox
         let mut sandbox = Sandbox::new(3, 3);
         sandbox.place_pixel_force(Sand.into(), 1, 0);
-        sandbox.place_pixel_force(Water.into(), 1, 1);
+        sandbox.place_pixel_force(Water::default().into(), 1, 1);
         sandbox.tick();
         let sand_new_cord = sandbox.coordinates_to_index(1, 1);
         let water_new_cord = sandbox.coordinates_to_index(1, 2);
@@ -226,7 +260,7 @@ mod test {
         );
         assert_eq!(
             sandbox.pixels[water_new_cord].pixel,
-            Water.into(),
+            Water::default().into(),
             "{:?}",
             &sandbox.pixels
         );
@@ -241,7 +275,7 @@ mod test {
         );
         assert_eq!(
             sandbox.pixels[water_new_cord].pixel,
-            Water.into(),
+            Water::default().into(),
             "{:?}",
             &sandbox.pixels
         );
@@ -252,9 +286,9 @@ mod test {
         let mut sandbox = Sandbox::new(3, 4);
         sandbox.place_pixel_force(Sand.into(), 1, 1);
         sandbox.place_pixel_force(Sand.into(), 1, 2);
-        sandbox.place_pixel_force(Water.into(), 0, 3);
-        sandbox.place_pixel_force(Water.into(), 1, 3);
-        sandbox.place_pixel_force(Water.into(), 2, 3);
+        sandbox.place_pixel_force(Water::default().into(), 0, 3);
+        sandbox.place_pixel_force(Water::default().into(), 1, 3);
+        sandbox.place_pixel_force(Water::default().into(), 2, 3);
         sandbox.tick();
         let sand1_new_cord = sandbox.coordinates_to_index(0, 2);
         let sand2_new_cord = sandbox.coordinates_to_index(1, 3);
@@ -275,19 +309,19 @@ mod test {
         );
         assert_eq!(
             sandbox.pixels[water1_new_cord].pixel,
-            Water.into(),
+            Water::default().into(),
             "{:?}",
             &sandbox.pixels
         );
         assert_eq!(
             sandbox.pixels[water2_new_cord].pixel,
-            Water.into(),
+            Water::default().into(),
             "{:?}",
             &sandbox.pixels
         );
         assert_eq!(
             sandbox.pixels[water3_new_cord].pixel,
-            Water.into(),
+            Water::default().into(),
             "{:?}",
             &sandbox.pixels
         );

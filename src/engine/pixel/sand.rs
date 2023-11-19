@@ -1,8 +1,16 @@
-use crate::engine::pixel::{BasicPixel, Pixel, PixelType};
-use crate::implement_basic_pixel;
-use anyhow::anyhow;
+use crate::engine::pixel::{PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct Sand;
 
-implement_basic_pixel!(Sand, PixelType::Solid(50), Pixel::Sand);
+impl PixelFundamental for Sand {
+    fn name(&self) -> &'static str {
+        "Sand"
+    }
+
+    fn pixel_type(&self) -> PixelType {
+        PixelType::Solid(50)
+    }
+}
+
+impl PixelInteract for Sand {}
