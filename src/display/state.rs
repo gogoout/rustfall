@@ -144,12 +144,13 @@ impl PixelHotkey for Pixel {
     fn hotkey(&self) -> char {
         match self {
             Pixel::Sand(_) => '1',
-            Pixel::Water(_) => '2',
-            Pixel::Rock(_) => '3',
+            Pixel::Rock(_) => '2',
+            Pixel::Water(_) => '3',
             Pixel::Steam(_) => '4',
-            Pixel::Fire(_) => '5',
-            Pixel::Wood(_) => '6',
-            Pixel::Ice(_) => '7',
+            Pixel::Ice(_) => '5',
+            Pixel::Fire(_) => '6',
+            Pixel::EternalFire(_) => '7',
+            Pixel::Wood(_) => '8',
             Pixel::Void(_) => '0',
         }
     }

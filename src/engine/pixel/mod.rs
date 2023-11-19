@@ -1,3 +1,4 @@
+pub mod eternal_fire;
 pub mod fire;
 pub mod ice;
 pub mod rock;
@@ -7,6 +8,7 @@ pub mod void;
 pub mod water;
 pub mod wood;
 
+use crate::engine::pixel::eternal_fire::EternalFire;
 use crate::engine::pixel::fire::Fire;
 use crate::engine::pixel::ice::Ice;
 use crate::engine::pixel::rock::Rock;
@@ -192,13 +194,14 @@ pub enum Pixel {
     Water(Water),
     Ice(Ice),
     Fire(Fire),
+    EternalFire(EternalFire),
     Wood(Wood),
     Void(Void),
 }
 
 impl Default for Pixel {
     fn default() -> Self {
-        Self::Void(Void)
+        Void::default().into()
     }
 }
 

@@ -131,6 +131,7 @@ impl PixelDisplay for Pixel {
             Pixel::Water(_) => Color::Blue,
             Pixel::Void(_) => Color::Black,
             Pixel::Fire(_) => Color::Red,
+            Pixel::EternalFire(_) => Color::Indexed(52),
             Pixel::Wood(val) => {
                 if val.is_burning() {
                     Color::Indexed(202)

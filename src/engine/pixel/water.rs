@@ -45,7 +45,7 @@ impl PixelFundamental for Water {
 impl PixelInteract for Water {
     fn interact(&mut self, target: Pixel) {
         match target {
-            Pixel::Fire(_) => {
+            Pixel::Fire(_) | Pixel::EternalFire(_) => {
                 if !self.is_burning() {
                     self.temp += 2;
                 }

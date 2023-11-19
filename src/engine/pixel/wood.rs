@@ -57,7 +57,7 @@ impl PixelInteract for Wood {
                     self.temp -= 30;
                 }
             }
-            Pixel::Fire(_) => {
+            Pixel::Fire(_) | Pixel::EternalFire(_) => {
                 if !self.is_burning() {
                     self.temp += 20;
                 }

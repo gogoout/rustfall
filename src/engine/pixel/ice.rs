@@ -33,7 +33,7 @@ impl PixelFundamental for Ice {
 impl PixelInteract for Ice {
     fn interact(&mut self, target: Pixel) {
         match target {
-            Pixel::Fire(_) => {
+            Pixel::Fire(_) | Pixel::EternalFire(_) => {
                 if !self.is_burning() {
                     self.temp += 20;
                 }
