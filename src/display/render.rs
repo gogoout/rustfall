@@ -1,9 +1,10 @@
 use std::sync::OnceLock;
 
 use itertools::Itertools;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::prelude::Marker;
 use ratatui::style::{Modifier, Style};
+use ratatui::widgets::block::Title;
 use ratatui::widgets::canvas::{Canvas, Painter, Shape};
 use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::{
@@ -60,7 +61,18 @@ impl Renderer {
                     Block::default()
                         .border_set(symbols::border::PLAIN)
                         .borders(Borders::ALL)
-                        .title("Rustfull"),
+                        .title("Rustfall")
+                        .title(
+                            Title::from(format!(
+                                "({} * {})",
+                                state.sandbox.width, state.sandbox.height
+                            ))
+                            .alignment(Alignment::Center),
+                        )
+                        .title(
+                            Title::from(format!("{:.2} fps", state.sandbox.fps()))
+                                .alignment(Alignment::Right),
+                        ),
                 )
                 .marker(match self.no_braille {
                     false => Marker::Braille,
@@ -93,7 +105,7 @@ impl Renderer {
                         .add_modifier(Modifier::ITALIC)
                         .bg(Color::DarkGray),
                 )
-                .highlight_symbol(">>"),
+                .highlight_symbol("[x]"),
             layout[1],
             &mut list_state,
         );
@@ -120,7 +132,8 @@ pub trait PixelDisplay {
 impl PixelDisplay for Pixel {
     fn display(&self) -> Color {
         match self {
-            Pixel::Steam(_) => Color::LightBlue,
+            // light blue
+            Pixel::Steam(_) => Color::Indexed(69),
             // darker yellow
             Pixel::Sand(_) => Color::LightYellow,
             // grey

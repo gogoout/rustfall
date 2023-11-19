@@ -1,5 +1,5 @@
-use crate::engine::pixel::{AdjacentPixels, BasicPixel, Direction, Pixel, PixelType};
-use rand::SeedableRng;
+use crate::engine::pixel::{BasicPixel, Direction, Pixel, PixelType};
+use std::time;
 
 #[derive(Debug, Default, Clone)]
 pub struct PixelContainer {
@@ -29,7 +29,9 @@ pub struct Sandbox {
     pub width: usize,
     pub height: usize,
     pub pixels: Vec<PixelContainer>,
-    rng: rand::rngs::SmallRng,
+    fps_start_time: time::Instant,
+    fps_frames: usize,
+    fps: f64,
 }
 
 impl Sandbox {
@@ -38,7 +40,9 @@ impl Sandbox {
             width,
             height,
             pixels: vec![PixelContainer::default(); width * height],
-            rng: rand::rngs::SmallRng::from_entropy(),
+            fps_start_time: time::Instant::now(),
+            fps_frames: 0,
+            fps: 0.0,
         }
     }
 
@@ -67,9 +71,7 @@ impl Sandbox {
         x == self.width - 1
     }
 
-    pub fn get_adjacent_pixel_index(&self, index: usize) -> AdjacentPixels {
-        let (x, y) = self.index_to_coordinates(index);
-
+    pub fn get_pixel_neighbour(&self, x: usize, y: usize, dir: Direction) -> Option<Pixel> {
         let get_pixel = |index| {
             self.pixels
                 .get(index)
@@ -80,61 +82,51 @@ impl Sandbox {
                 .map(|c| c.pixel())
         };
 
-        let top = match self.is_coordinate_top_most(y) {
-            true => None,
-            false => Some(self.coordinates_to_index(x, y - 1)),
-        }
-        .and_then(get_pixel);
-        let bottom = match self.is_coordinate_bottom_most(y) {
-            true => None,
-            false => Some(self.coordinates_to_index(x, y + 1)),
-        }
-        .and_then(get_pixel);
-        let left = match self.is_coordinate_left_most(x) {
-            true => None,
-            false => Some(self.coordinates_to_index(x - 1, y)),
-        }
-        .and_then(get_pixel);
-        let right = match self.is_coordinate_right_most(x) {
-            true => None,
-            false => Some(self.coordinates_to_index(x + 1, y)),
-        }
-        .and_then(get_pixel);
-        let top_left = match self.is_coordinate_top_most(y) || self.is_coordinate_left_most(x) {
-            true => None,
-            false => Some(self.coordinates_to_index(x - 1, y - 1)),
-        }
-        .and_then(get_pixel);
-        let top_right = match self.is_coordinate_top_most(y) || self.is_coordinate_right_most(x) {
-            true => None,
-            false => Some(self.coordinates_to_index(x + 1, y - 1)),
-        }
-        .and_then(get_pixel);
-        let bottom_left =
-            match self.is_coordinate_bottom_most(y) || self.is_coordinate_left_most(x) {
+        let idx = match dir {
+            Direction::Up => match self.is_coordinate_top_most(y) {
                 true => None,
-                false => Some(self.coordinates_to_index(x - 1, y + 1)),
-            }
-            .and_then(get_pixel);
-        let bottom_right =
-            match self.is_coordinate_bottom_most(y) || self.is_coordinate_right_most(x) {
+                false => Some(self.coordinates_to_index(x, y - 1)),
+            },
+            Direction::Down => match self.is_coordinate_bottom_most(y) {
                 true => None,
-                false => Some(self.coordinates_to_index(x + 1, y + 1)),
+                false => Some(self.coordinates_to_index(x, y + 1)),
+            },
+            Direction::Left => match self.is_coordinate_left_most(x) {
+                true => None,
+                false => Some(self.coordinates_to_index(x - 1, y)),
+            },
+            Direction::Right => match self.is_coordinate_right_most(x) {
+                true => None,
+                false => Some(self.coordinates_to_index(x + 1, y)),
+            },
+            Direction::UpLeft => {
+                match self.is_coordinate_top_most(y) || self.is_coordinate_left_most(x) {
+                    true => None,
+                    false => Some(self.coordinates_to_index(x - 1, y - 1)),
+                }
             }
-            .and_then(get_pixel);
+            Direction::UpRight => {
+                match self.is_coordinate_top_most(y) || self.is_coordinate_right_most(x) {
+                    true => None,
+                    false => Some(self.coordinates_to_index(x + 1, y - 1)),
+                }
+            }
+            Direction::DownLeft => {
+                match self.is_coordinate_bottom_most(y) || self.is_coordinate_left_most(x) {
+                    true => None,
+                    false => Some(self.coordinates_to_index(x - 1, y + 1)),
+                }
+            }
+            Direction::DownRight => {
+                match self.is_coordinate_bottom_most(y) || self.is_coordinate_right_most(x) {
+                    true => None,
+                    false => Some(self.coordinates_to_index(x + 1, y + 1)),
+                }
+            }
+        };
 
-        AdjacentPixels {
-            top,
-            bottom,
-            left,
-            right,
-            top_left,
-            top_right,
-            bottom_left,
-            bottom_right,
-        }
+        idx.and_then(get_pixel)
     }
-
     pub fn place_pixel(&mut self, pixel: Pixel, x: usize, y: usize) {
         let index = self.coordinates_to_index(x, y);
         if let Some(p) = self.pixels.get_mut(index) {
@@ -152,9 +144,21 @@ impl Sandbox {
         }
     }
 
-    pub fn tick(&mut self) {
-        self.pixels.iter_mut().for_each(|p| p.mark_is_moved(false));
+    fn track_fps(&mut self) {
+        self.fps_frames += 1;
+        let elapsed = (time::Instant::now() - self.fps_start_time).as_millis();
+        if elapsed >= 1000 {
+            self.fps = self.fps_frames as f64 / elapsed as f64 * 1000.0;
+            self.fps_frames = 0;
+            self.fps_start_time = time::Instant::now();
+        }
+    }
 
+    pub fn fps(&self) -> f64 {
+        self.fps
+    }
+
+    pub fn tick(&mut self) {
         let mut idx = self.pixels.len() - 1;
 
         loop {
@@ -173,11 +177,9 @@ impl Sandbox {
                 continue;
             }
 
-            let adjacent_pixels = self.get_adjacent_pixel_index(idx);
+            let (x, y) = self.index_to_coordinates(idx);
 
-            if let Some(dir) = pixel.pixel().tick_move(&adjacent_pixels, &mut self.rng) {
-                let (x, y) = self.index_to_coordinates(idx);
-
+            if let Some(dir) = pixel.pixel().tick_move(x, y, self) {
                 let new_index = match dir {
                     Direction::Up => self.coordinates_to_index(x, y - 1),
                     Direction::Left => self.coordinates_to_index(x - 1, y),
@@ -200,6 +202,9 @@ impl Sandbox {
             }
             idx -= 1;
         }
+
+        self.pixels.iter_mut().for_each(|p| p.mark_is_moved(false));
+        self.track_fps();
     }
 }
 

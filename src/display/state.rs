@@ -69,8 +69,12 @@ impl State {
 
     fn handle_mouse_event(&mut self, e: MouseEvent) {
         match e.kind {
-            MouseEventKind::Down(_) | MouseEventKind::Drag(_) => {
+            MouseEventKind::Down(_) => {
                 self.mouse_down_event = Some(e);
+            }
+            MouseEventKind::Drag(_) => {
+                self.mouse_down_event = Some(e);
+                self.handle_mouse_down_event();
             }
             MouseEventKind::Up(_) => {
                 self.mouse_down_event = None;

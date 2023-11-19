@@ -9,9 +9,8 @@ use crate::engine::pixel::sand::Sand;
 use crate::engine::pixel::steam::Steam;
 use crate::engine::pixel::void::Void;
 use crate::engine::pixel::water::Water;
-use rand::Rng;
+use crate::engine::sandbox::Sandbox;
 use std::fmt::{Display, Formatter};
-use std::sync::OnceLock;
 
 /// Holds the type and density of a pixel
 #[derive(Debug, Eq, PartialEq)]
@@ -48,142 +47,43 @@ impl RandNum {
     }
 }
 
-impl Direction {
-    pub fn shuffled_slice<R: Rng>(mut rng: R) -> [Direction; 8] {
-        const MAX_SHUFFLES: usize = 1000;
-
-        static ALL_SHUFFLED_LOCK: OnceLock<Vec<[Direction; 8]>> = OnceLock::new();
-        let v = ALL_SHUFFLED_LOCK.get_or_init(|| {
-            let mut all_shuffled = Vec::with_capacity(MAX_SHUFFLES);
-
-            for _ in 0..MAX_SHUFFLES {
-                use rand::seq::SliceRandom;
-                let mut directions = [
-                    Direction::Up,
-                    Direction::Down,
-                    Direction::Left,
-                    Direction::Right,
-                    Direction::UpLeft,
-                    Direction::UpRight,
-                    Direction::DownLeft,
-                    Direction::DownRight,
-                ];
-                directions.shuffle(&mut rng);
-                all_shuffled.push(directions);
-            }
-            all_shuffled
-        });
-
-        let idx = rng.gen_range(0..MAX_SHUFFLES);
-        v[idx]
-    }
-}
-
-pub struct AdjacentPixels {
-    pub top: Option<Pixel>,
-    pub bottom: Option<Pixel>,
-    pub left: Option<Pixel>,
-    pub right: Option<Pixel>,
-    pub top_left: Option<Pixel>,
-    pub top_right: Option<Pixel>,
-    pub bottom_left: Option<Pixel>,
-    pub bottom_right: Option<Pixel>,
-}
-
 pub trait BasicPixel {
     fn name(&self) -> &'static str;
 
     fn pixel_type(&self) -> PixelType;
 
-    fn tick_move<R: Rng>(&self, adjacent_pixels: &AdjacentPixels, rng: R) -> Option<Direction> {
-        let check_density = |density, target: &Option<Pixel>, dir: Direction, reverse: bool| {
-            target.and_then(|target| match target.pixel_type() {
-                PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
-                    match (density == td, density > td, reverse) {
-                        (true, _, _) => None,
-                        (false, true, false) => Some(dir),
-                        (false, false, true) => Some(dir),
-                        _ => None,
+    fn tick_move(&self, x: usize, y: usize, sandbox: &Sandbox) -> Option<Direction> {
+        let check_density = |density, dir: Direction, reverse: bool| {
+            sandbox
+                .get_pixel_neighbour(x, y, dir)
+                .and_then(|target| match target.pixel_type() {
+                    PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
+                        match (density == td, density > td, reverse) {
+                            (true, _, _) => None,
+                            (false, true, false) => Some(dir),
+                            (false, false, true) => Some(dir),
+                            _ => None,
+                        }
                     }
-                }
-                PixelType::Wall => None,
-                PixelType::Void => Some(dir),
-            })
+                    PixelType::Wall => None,
+                    PixelType::Void => Some(dir),
+                })
         };
 
         match self.pixel_type() {
-            PixelType::Gas(density) => {
-                Direction::shuffled_slice(rng)
-                    .iter()
-                    .find_map(|dir| match dir {
-                        Direction::Up => check_density(density, &adjacent_pixels.top, *dir, true),
-                        Direction::Left => {
-                            check_density(density, &adjacent_pixels.left, *dir, true)
-                        }
-                        Direction::Right => {
-                            check_density(density, &adjacent_pixels.right, *dir, true)
-                        }
-                        Direction::UpLeft => {
-                            check_density(density, &adjacent_pixels.top_left, *dir, true)
-                        }
-                        Direction::UpRight => {
-                            check_density(density, &adjacent_pixels.top_right, *dir, true)
-                        }
-                        Direction::Down => {
-                            check_density(density, &adjacent_pixels.bottom, *dir, false)
-                        }
-                        Direction::DownLeft => {
-                            check_density(density, &adjacent_pixels.bottom_left, *dir, false)
-                        }
-                        Direction::DownRight => {
-                            check_density(density, &adjacent_pixels.bottom_right, *dir, false)
-                        }
-                    })
-            }
-            PixelType::Liquid(density) => {
-                check_density(density, &adjacent_pixels.bottom, Direction::Down, false)
-                    .or_else(|| {
-                        check_density(
-                            density,
-                            &adjacent_pixels.bottom_left,
-                            Direction::DownLeft,
-                            false,
-                        )
-                    })
-                    .or_else(|| {
-                        check_density(
-                            density,
-                            &adjacent_pixels.bottom_right,
-                            Direction::DownRight,
-                            false,
-                        )
-                    })
-                    .or_else(|| {
-                        check_density(density, &adjacent_pixels.left, Direction::Left, false)
-                    })
-                    .or_else(|| {
-                        check_density(density, &adjacent_pixels.right, Direction::Right, false)
-                    })
-            }
-            PixelType::Solid(density) => {
-                check_density(density, &adjacent_pixels.bottom, Direction::Down, false)
-                    .or_else(|| {
-                        check_density(
-                            density,
-                            &adjacent_pixels.bottom_left,
-                            Direction::DownLeft,
-                            false,
-                        )
-                    })
-                    .or_else(|| {
-                        check_density(
-                            density,
-                            &adjacent_pixels.bottom_right,
-                            Direction::DownRight,
-                            false,
-                        )
-                    })
-            }
+            PixelType::Gas(density) => check_density(density, Direction::Up, true)
+                .or_else(|| check_density(density, Direction::UpRight, true))
+                .or_else(|| check_density(density, Direction::UpLeft, true))
+                .or_else(|| check_density(density, Direction::Right, true))
+                .or_else(|| check_density(density, Direction::Left, true)),
+            PixelType::Liquid(density) => check_density(density, Direction::Down, false)
+                .or_else(|| check_density(density, Direction::DownLeft, false))
+                .or_else(|| check_density(density, Direction::DownRight, false))
+                .or_else(|| check_density(density, Direction::Left, false))
+                .or_else(|| check_density(density, Direction::Right, false)),
+            PixelType::Solid(density) => check_density(density, Direction::Down, false)
+                .or_else(|| check_density(density, Direction::DownLeft, false))
+                .or_else(|| check_density(density, Direction::DownRight, false)),
             PixelType::Wall | PixelType::Void => None,
         }
     }

@@ -7,7 +7,7 @@ use crossterm::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
-use crate::display::event::EventHandler;
+use crate::display::event::{Event, EventHandler};
 use crate::display::render::Renderer;
 use crate::display::state::State;
 
@@ -69,8 +69,16 @@ impl Tui {
 
     pub fn run(&mut self) -> anyhow::Result<()> {
         while !self.state.should_quit {
-            self.draw()?;
-            self.state.update(self.events.next()?);
+            let e = self.events.next()?;
+            match e {
+                Event::Tick => {
+                    self.state.update(e);
+                    self.draw()?;
+                }
+                _ => {
+                    self.state.update(e);
+                }
+            }
         }
 
         Ok(())
