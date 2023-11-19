@@ -131,7 +131,7 @@ pub trait BasicPixel {
     fn tick_move(&self, x: usize, y: usize, sandbox: &mut Sandbox) -> Option<Direction> {
         let check_density = |sandbox: &Sandbox, density, dir: Direction, reverse: bool| {
             sandbox
-                .get_pixel_neighbour(x, y, dir)
+                .get_neighbour_pixel(x, y, dir)
                 .and_then(|target| match target.pixel_type() {
                     PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
                         match (density == td, density > td, reverse) {

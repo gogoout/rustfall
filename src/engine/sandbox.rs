@@ -58,22 +58,25 @@ impl Sandbox {
         (x, y)
     }
 
-    pub fn is_coordinate_top_most(&self, y: usize) -> bool {
-        y == 0
-    }
-    pub fn is_coordinate_bottom_most(&self, y: usize) -> bool {
-        y == self.height - 1
+    pub fn is_coordinate_in_bound(&self, x: usize, y: usize) -> bool {
+        // don't check for negative values here, assume it's not possible to have canvas this big
+        x < self.width && y < self.height
     }
 
-    pub fn is_coordinate_left_most(&self, x: usize) -> bool {
-        x == 0
+    pub fn get_neighbour_coordinates(&self, x: usize, y: usize, dir: Direction) -> (usize, usize) {
+        match dir {
+            Direction::Up => (x, y - 1),
+            Direction::Down => (x, y + 1),
+            Direction::Left => (x - 1, y),
+            Direction::Right => (x + 1, y),
+            Direction::UpLeft => (x - 1, y - 1),
+            Direction::UpRight => (x + 1, y - 1),
+            Direction::DownLeft => (x - 1, y + 1),
+            Direction::DownRight => (x + 1, y + 1),
+        }
     }
 
-    pub fn is_coordinate_right_most(&self, x: usize) -> bool {
-        x == self.width - 1
-    }
-
-    pub fn get_pixel_neighbour(&self, x: usize, y: usize, dir: Direction) -> Option<Pixel> {
+    pub fn get_neighbour_pixel(&self, x: usize, y: usize, dir: Direction) -> Option<Pixel> {
         let get_pixel = |index| {
             self.pixels
                 .get(index)
@@ -84,50 +87,11 @@ impl Sandbox {
                 .map(|c| c.pixel())
         };
 
-        let idx = match dir {
-            Direction::Up => match self.is_coordinate_top_most(y) {
-                true => None,
-                false => Some(self.coordinates_to_index(x, y - 1)),
-            },
-            Direction::Down => match self.is_coordinate_bottom_most(y) {
-                true => None,
-                false => Some(self.coordinates_to_index(x, y + 1)),
-            },
-            Direction::Left => match self.is_coordinate_left_most(x) {
-                true => None,
-                false => Some(self.coordinates_to_index(x - 1, y)),
-            },
-            Direction::Right => match self.is_coordinate_right_most(x) {
-                true => None,
-                false => Some(self.coordinates_to_index(x + 1, y)),
-            },
-            Direction::UpLeft => {
-                match self.is_coordinate_top_most(y) || self.is_coordinate_left_most(x) {
-                    true => None,
-                    false => Some(self.coordinates_to_index(x - 1, y - 1)),
-                }
-            }
-            Direction::UpRight => {
-                match self.is_coordinate_top_most(y) || self.is_coordinate_right_most(x) {
-                    true => None,
-                    false => Some(self.coordinates_to_index(x + 1, y - 1)),
-                }
-            }
-            Direction::DownLeft => {
-                match self.is_coordinate_bottom_most(y) || self.is_coordinate_left_most(x) {
-                    true => None,
-                    false => Some(self.coordinates_to_index(x - 1, y + 1)),
-                }
-            }
-            Direction::DownRight => {
-                match self.is_coordinate_bottom_most(y) || self.is_coordinate_right_most(x) {
-                    true => None,
-                    false => Some(self.coordinates_to_index(x + 1, y + 1)),
-                }
-            }
-        };
-
-        idx.and_then(get_pixel)
+        let (x, y) = self.get_neighbour_coordinates(x, y, dir);
+        match self.is_coordinate_in_bound(x, y) {
+            false => None,
+            true => get_pixel(self.coordinates_to_index(x, y)),
+        }
     }
     pub fn place_pixel(&mut self, pixel: Pixel, x: usize, y: usize) {
         let index = self.coordinates_to_index(x, y);
@@ -182,16 +146,8 @@ impl Sandbox {
             let (x, y) = self.index_to_coordinates(idx);
 
             if let Some(dir) = pixel.pixel().tick_move(x, y, self) {
-                let new_index = match dir {
-                    Direction::Up => self.coordinates_to_index(x, y - 1),
-                    Direction::Left => self.coordinates_to_index(x - 1, y),
-                    Direction::Right => self.coordinates_to_index(x + 1, y),
-                    Direction::UpLeft => self.coordinates_to_index(x - 1, y - 1),
-                    Direction::UpRight => self.coordinates_to_index(x + 1, y - 1),
-                    Direction::Down => self.coordinates_to_index(x, y + 1),
-                    Direction::DownLeft => self.coordinates_to_index(x - 1, y + 1),
-                    Direction::DownRight => self.coordinates_to_index(x + 1, y + 1),
-                };
+                let (new_x, new_y) = self.get_neighbour_coordinates(x, y, dir);
+                let new_index = self.coordinates_to_index(new_x, new_y);
 
                 let pixel = self.pixels.get_mut(idx).unwrap();
                 pixel.mark_is_moved(true);
@@ -207,6 +163,25 @@ impl Sandbox {
 
         self.pixels.iter_mut().for_each(|p| p.mark_is_moved(false));
         self.track_fps();
+    }
+
+    pub fn resize(&mut self, width: usize, height: usize) {
+        let width_delta = width as isize - self.width as isize;
+        let height_delta = height as isize - self.height as isize;
+
+        let mut new_sandbox = Sandbox::new(width, height);
+        self.pixels.iter().enumerate().for_each(|(idx, p)| {
+            let (x, y) = self.index_to_coordinates(idx);
+            let new_x = x as isize + width_delta / 2;
+            let new_y = y as isize + height_delta / 2;
+            if new_sandbox.is_coordinate_in_bound(new_x as usize, new_y as usize) {
+                new_sandbox.place_pixel_force(p.pixel, new_x as usize, new_y as usize);
+            }
+        });
+
+        self.width = new_sandbox.width;
+        self.height = new_sandbox.height;
+        self.pixels = new_sandbox.pixels;
     }
 }
 

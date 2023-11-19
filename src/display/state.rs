@@ -2,6 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKi
 use strum::IntoEnumIterator;
 
 use crate::display::event::Event;
+use crate::display::render::Renderer;
 use crate::engine::pixel::Pixel;
 use crate::engine::sandbox::Sandbox;
 
@@ -20,6 +21,8 @@ pub struct State {
 impl State {
     /// Constructs a new instance of [`State`].
     pub fn new(width: usize, height: usize, no_braille: bool) -> Self {
+        let (width, height) = Self::calculate_sandbox_size(width, height, no_braille);
+
         Self {
             should_quit: false,
             sandbox: Sandbox::new(width, height),
@@ -27,6 +30,14 @@ impl State {
             no_braille,
             mouse_down_event: None,
             pause: false,
+        }
+    }
+
+    fn calculate_sandbox_size(width: usize, height: usize, no_braille: bool) -> (usize, usize) {
+        let (width, height) = Renderer::sandbox_size(width, height);
+        match no_braille {
+            true => (width, height),
+            false => (width * 2, height * 4),
         }
     }
 
@@ -50,7 +61,11 @@ impl State {
             Event::Mouse(mouse) => {
                 self.handle_mouse_event(mouse);
             }
-            _ => {}
+            Event::Resize(width, height) => {
+                let (width, height) =
+                    Self::calculate_sandbox_size(width as usize, height as usize, self.no_braille);
+                self.sandbox.resize(width, height);
+            }
         }
     }
 
@@ -115,10 +130,8 @@ impl State {
         }
 
         match self.active_pixel {
-            Pixel::Void(_) => self
-                .sandbox
-                .place_pixel_force(self.active_pixel.clone(), x, y),
-            _ => self.sandbox.place_pixel(self.active_pixel.clone(), x, y),
+            Pixel::Void(_) => self.sandbox.place_pixel_force(self.active_pixel, x, y),
+            _ => self.sandbox.place_pixel(self.active_pixel, x, y),
         }
     }
 }

@@ -36,8 +36,7 @@ impl Tui {
         let renderer = Renderer::new(no_braille);
 
         let rect = terminal.size()?;
-        let (width, height) = renderer.sandbox_size(rect);
-        let state = State::new(width, height, no_braille);
+        let state = State::new(rect.width as usize, rect.height as usize, no_braille);
 
         Ok(Self {
             terminal,

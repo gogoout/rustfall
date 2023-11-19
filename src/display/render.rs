@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use itertools::Itertools;
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::prelude::Marker;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::block::Title;
@@ -111,16 +111,13 @@ impl Renderer {
         );
     }
 
-    pub fn sandbox_size(&self, rect: Rect) -> (usize, usize) {
-        let width = (rect.width - Self::pixel_bar_width()) as usize;
-        let height = rect.height as usize;
+    pub fn sandbox_size(width: usize, height: usize) -> (usize, usize) {
+        let width = width - Self::pixel_bar_width() as usize;
+        let height = height;
         let canvas_width = width - 2;
         let canvas_height = height - 2;
 
-        match self.no_braille {
-            false => (canvas_width * 2, canvas_height * 4),
-            true => (canvas_width, canvas_height),
-        }
+        (canvas_width, canvas_height)
     }
 }
 
