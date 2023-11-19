@@ -31,14 +31,16 @@ impl PixelFundamental for Steam {
 impl PixelInteract for Steam {
     fn interact(&mut self, target: Pixel) {
         match target {
-            Pixel::Water(_) => {
+            Pixel::Water(_) | Pixel::Steam(_) => {
                 if self.temp > 0 {
                     self.temp -= 1;
                 }
             }
-            Pixel::Steam(_) => {
-                if self.temp > 0 {
-                    self.temp -= 1;
+            Pixel::Ice(_) => {
+                if self.temp > 1 {
+                    self.temp -= 2;
+                } else {
+                    self.temp = 0;
                 }
             }
             _ => {}

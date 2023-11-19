@@ -138,6 +138,7 @@ impl PixelDisplay for Pixel {
                     Color::Yellow
                 }
             }
+            Pixel::Ice(_) => Color::Indexed(195),
         }
     }
 }

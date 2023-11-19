@@ -50,8 +50,11 @@ impl PixelInteract for Wood {
             Pixel::Water(_) => {
                 if self.is_burning() {
                     self.temp -= 20;
-                } else {
-                    self.temp = 0;
+                }
+            }
+            Pixel::Ice(_) => {
+                if self.is_burning() {
+                    self.temp -= 30;
                 }
             }
             Pixel::Fire(_) => {

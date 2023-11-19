@@ -1,4 +1,5 @@
 pub mod fire;
+pub mod ice;
 pub mod rock;
 pub mod sand;
 pub mod steam;
@@ -7,6 +8,7 @@ pub mod water;
 pub mod wood;
 
 use crate::engine::pixel::fire::Fire;
+use crate::engine::pixel::ice::Ice;
 use crate::engine::pixel::rock::Rock;
 use crate::engine::pixel::sand::Sand;
 use crate::engine::pixel::steam::Steam;
@@ -188,6 +190,7 @@ pub enum Pixel {
     Sand(Sand),
     Rock(Rock),
     Water(Water),
+    Ice(Ice),
     Fire(Fire),
     Wood(Wood),
     Void(Void),
