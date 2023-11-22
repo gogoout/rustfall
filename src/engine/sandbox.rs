@@ -138,21 +138,13 @@ impl Sandbox {
     }
 
     pub fn tick(&mut self) {
-        let mut idx = self.pixels.len() - 1;
-
-        loop {
-            if idx == 0 {
-                break;
-            }
-
+        for idx in (0..self.pixels.len() - 1).rev() {
             let pixel = self.pixels.get(idx).unwrap();
             if pixel.pixel().pixel_type() == PixelType::Void {
-                idx -= 1;
                 continue;
             }
 
             if pixel.is_moved {
-                idx -= 1;
                 continue;
             }
 
@@ -170,15 +162,9 @@ impl Sandbox {
 
                 self.pixels.swap(idx, new_index);
             }
-            idx -= 1;
         }
 
-        let mut idx = self.pixels.len() - 1;
-
-        loop {
-            if idx == 0 {
-                break;
-            }
+        for idx in (0..self.pixels.len() - 1).rev() {
             let (x, y) = self.index_to_coordinates(idx);
 
             let neighbour = [
@@ -202,8 +188,6 @@ impl Sandbox {
             if let Some(new_pixel) = PixelFundamental::update(pixel.pixel_mut()) {
                 pixel.pixel = new_pixel;
             }
-
-            idx -= 1;
         }
 
         self.pixels.iter_mut().for_each(|p| p.mark_is_moved(false));
