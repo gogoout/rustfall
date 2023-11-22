@@ -142,25 +142,25 @@ pub trait PixelFundamental {
         None
     }
 
-    fn tick_move(&self, x: usize, y: usize, sandbox: &mut Sandbox) -> Option<Direction> {
+    fn tick_move(&self, x: usize, y: usize, sandbox: &mut Sandbox) -> Option<(usize, usize)> {
         let check_density = |sandbox: &Sandbox, density, dir: Direction, reverse: bool| {
             sandbox
                 .get_neighbour_pixel(x, y, dir)
-                .and_then(|target| match target.is_moved() {
+                .and_then(|(x, y, p)| match p.is_moved() {
                     true => None,
-                    false => Some(target.pixel().pixel_type()),
+                    false => Some((x, y, p.pixel().pixel_type())),
                 })
-                .and_then(|t| match t {
+                .and_then(|(x, y, p)| match p {
                     PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
                         match (density == td, density > td, reverse) {
                             (true, _, _) => None,
-                            (false, true, false) => Some(dir),
-                            (false, false, true) => Some(dir),
+                            (false, true, false) => Some((x, y)),
+                            (false, false, true) => Some((x, y)),
                             _ => None,
                         }
                     }
                     PixelType::Wall => None,
-                    PixelType::Void => Some(dir),
+                    PixelType::Void => Some((x, y)),
                 })
         };
 

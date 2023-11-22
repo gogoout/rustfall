@@ -69,16 +69,27 @@ impl Sandbox {
         x < self.width && y < self.height
     }
 
-    pub fn get_neighbour_coordinates(&self, x: usize, y: usize, dir: Direction) -> (usize, usize) {
+    pub fn get_neighbour_coordinates(
+        &self,
+        x: usize,
+        y: usize,
+        dir: Direction,
+    ) -> Option<(usize, usize)> {
+        let is_not_on_top = || y > 0;
+        let is_not_on_bottom = || y < self.height - 1;
+        let is_not_on_left = || x > 0;
+        let is_not_on_right = || x < self.width - 1;
+
         match dir {
-            Direction::Up => (x, y - 1),
-            Direction::Down => (x, y + 1),
-            Direction::Left => (x - 1, y),
-            Direction::Right => (x + 1, y),
-            Direction::UpLeft => (x - 1, y - 1),
-            Direction::UpRight => (x + 1, y - 1),
-            Direction::DownLeft => (x - 1, y + 1),
-            Direction::DownRight => (x + 1, y + 1),
+            Direction::Up if is_not_on_top() => Some((x, y - 1)),
+            Direction::Down if is_not_on_bottom() => Some((x, y + 1)),
+            Direction::Left if is_not_on_left() => Some((x - 1, y)),
+            Direction::Right if is_not_on_right() => Some((x + 1, y)),
+            Direction::UpLeft if is_not_on_top() && is_not_on_left() => Some((x - 1, y - 1)),
+            Direction::UpRight if is_not_on_top() && is_not_on_right() => Some((x + 1, y - 1)),
+            Direction::DownLeft if is_not_on_bottom() && is_not_on_left() => Some((x - 1, y + 1)),
+            Direction::DownRight if is_not_on_bottom() && is_not_on_right() => Some((x + 1, y + 1)),
+            _ => None,
         }
     }
 
@@ -87,12 +98,13 @@ impl Sandbox {
         x: usize,
         y: usize,
         dir: Direction,
-    ) -> Option<&PixelContainer> {
-        let (x, y) = self.get_neighbour_coordinates(x, y, dir);
-        match self.is_coordinate_in_bound(x, y) {
-            false => None,
-            true => self.pixels.get(self.coordinates_to_index(x, y)),
-        }
+    ) -> Option<(usize, usize, &PixelContainer)> {
+        self.get_neighbour_coordinates(x, y, dir)
+            .and_then(|(x, y)| {
+                self.pixels
+                    .get(self.coordinates_to_index(x, y))
+                    .map(|p| (x, y, p))
+            })
     }
     pub fn place_pixel(&mut self, pixel: Pixel, x: usize, y: usize) {
         let index = self.coordinates_to_index(x, y);
@@ -146,8 +158,7 @@ impl Sandbox {
 
             let (x, y) = self.index_to_coordinates(idx);
 
-            if let Some(dir) = pixel.pixel().tick_move(x, y, self) {
-                let (new_x, new_y) = self.get_neighbour_coordinates(x, y, dir);
+            if let Some((new_x, new_y)) = pixel.pixel().tick_move(x, y, self) {
                 let new_index = self.coordinates_to_index(new_x, new_y);
 
                 let pixel = self.pixels.get_mut(idx).unwrap();
@@ -172,13 +183,13 @@ impl Sandbox {
 
             let neighbour = [
                 self.get_neighbour_pixel(x, y, Direction::Up)
-                    .map(|c| c.pixel()),
+                    .map(|(_, _, c)| c.pixel()),
                 self.get_neighbour_pixel(x, y, Direction::Down)
-                    .map(|c| c.pixel()),
+                    .map(|(_, _, c)| c.pixel()),
                 self.get_neighbour_pixel(x, y, Direction::Left)
-                    .map(|c| c.pixel()),
+                    .map(|(_, _, c)| c.pixel()),
                 self.get_neighbour_pixel(x, y, Direction::Right)
-                    .map(|c| c.pixel()),
+                    .map(|(_, _, c)| c.pixel()),
             ];
 
             let pixel = self.pixels.get_mut(idx).unwrap();
