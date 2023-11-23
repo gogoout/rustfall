@@ -57,7 +57,7 @@ impl State {
 
     pub fn update(&mut self, event: Event) {
         match event {
-            Event::Tick => self.tick(),
+            // Event::Tick => self.tick(),
             Event::Key(key) => self.handle_key_event(key),
             Event::Mouse(mouse) => {
                 self.handle_mouse_event(mouse);

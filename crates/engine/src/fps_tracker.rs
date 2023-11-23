@@ -20,7 +20,7 @@ impl Default for FpsTracker {
 impl FpsTracker {
     pub fn track_fps(&mut self) {
         self.fps_frames += 1;
-        let elapsed = (time::Instant::now() - self.fps_start_time).as_millis();
+        let elapsed = self.fps_start_time.elapsed().as_millis();
         if elapsed >= 1000 {
             self.fps = self.fps_frames as f64 / elapsed as f64 * 1000.0;
             self.fps_frames = 0;

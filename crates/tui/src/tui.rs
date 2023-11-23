@@ -1,3 +1,4 @@
+use std::time::{Duration, Instant};
 use std::{io, panic};
 
 use crossterm::{
@@ -7,7 +8,7 @@ use crossterm::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
-use crate::event::{Event, EventHandler};
+use crate::event::EventHandler;
 use crate::render::Renderer;
 use crate::state::State;
 
@@ -32,7 +33,7 @@ impl Tui {
         let backend = CrosstermBackend::new(io::stderr());
 
         let terminal = Terminal::new(backend)?;
-        let events = EventHandler::new(16);
+        let events = EventHandler::new();
         let renderer = Renderer::new(no_braille);
 
         let rect = terminal.size()?;
@@ -61,22 +62,31 @@ impl Tui {
             panic_hook(panic);
         }));
 
-        // self.terminal.hide_cursor()?;
+        self.terminal.hide_cursor()?;
         self.terminal.clear()?;
         Ok(())
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
+        const TICK_RATE: Duration = Duration::from_micros(16667);
+        // Why do I need to have this offset here??
+        // Remove this cause the fps to stay consistent at 50 fps
+        const OFFSET: Duration = Duration::from_millis(5);
+
+        let mut last_tick = Instant::now();
         while !self.state.should_quit {
-            let e = self.events.next()?;
-            match e {
-                Event::Tick => {
-                    self.state.update(e);
-                    self.draw()?;
-                }
-                _ => {
-                    self.state.update(e);
-                }
+            if let Some(e) = TICK_RATE
+                .checked_sub(last_tick.elapsed() + OFFSET)
+                .and_then(|timeout| self.events.next(timeout).transpose())
+                .transpose()?
+            {
+                self.state.update(e);
+            }
+
+            if last_tick.elapsed() >= TICK_RATE {
+                last_tick = Instant::now();
+                self.draw()?;
+                self.state.tick();
             }
         }
 
@@ -108,7 +118,7 @@ impl Tui {
     /// It disables the raw mode and reverts back the terminal properties.
     pub fn exit(&mut self) -> anyhow::Result<()> {
         Self::reset()?;
-        // self.terminal.show_cursor()?;
+        self.terminal.show_cursor()?;
         Ok(())
     }
 }

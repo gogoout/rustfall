@@ -116,7 +116,7 @@ impl<R: Rng> Sandbox<R> {
             if p.pixel.pixel_type() != PixelType::Void {
                 return;
             }
-            *p = PixelContainer::new(pixel);
+            *p = 1::new(pixel);
         }
     }
 
