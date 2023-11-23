@@ -1,7 +1,9 @@
 use std::ops::Deref;
 use std::sync::OnceLock;
 
+use engine::fps_tracker::FpsTracker;
 use itertools::Itertools;
+use rand::Rng;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::prelude::Marker;
 use ratatui::style::{Modifier, Style};
@@ -22,10 +24,14 @@ use engine::sandbox::Sandbox;
 
 pub struct Renderer {
     no_braille: bool,
+    fps_tracker: FpsTracker,
 }
 impl Renderer {
     pub fn new(no_braille: bool) -> Self {
-        Self { no_braille }
+        Self {
+            no_braille,
+            fps_tracker: Default::default(),
+        }
     }
 
     fn pixel_bar_width() -> u16 {
@@ -41,7 +47,9 @@ impl Renderer {
         })
     }
 
-    pub fn render(&self, state: &State, f: &mut Frame) {
+    pub fn render(&mut self, state: &State, f: &mut Frame) {
+        self.fps_tracker.track_fps();
+
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![
@@ -65,7 +73,7 @@ impl Renderer {
                             .alignment(Alignment::Center),
                         )
                         .title(
-                            Title::from(format!("{:.2} fps", state.sandbox.fps()))
+                            Title::from(format!("{:.2} fps", self.fps_tracker.fps()))
                                 .alignment(Alignment::Right),
                         ),
                 )
@@ -145,16 +153,16 @@ impl PixelDisplay for Pixel {
     }
 }
 
-struct TuiSandbox<'a>(&'a Sandbox);
-impl Deref for TuiSandbox<'_> {
-    type Target = Sandbox;
+struct TuiSandbox<'a, R: Rng>(&'a Sandbox<R>);
+impl<R: Rng> Deref for TuiSandbox<'_, R> {
+    type Target = Sandbox<R>;
 
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl Shape for TuiSandbox<'_> {
+impl<R: Rng> Shape for TuiSandbox<'_, R> {
     fn draw(&self, painter: &mut Painter) {
         for (idx, pixel) in self.pixels.iter().enumerate() {
             if let Pixel::Void(_) = pixel.pixel() {

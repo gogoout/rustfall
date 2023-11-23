@@ -1,5 +1,7 @@
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
+
 use crate::pixel::{Direction, Pixel, PixelFundamental, PixelInteract, PixelType};
-use std::time;
 
 #[derive(Debug, Default, Clone)]
 pub struct PixelContainer {
@@ -31,27 +33,29 @@ impl PixelContainer {
 }
 
 #[derive(Debug)]
-pub struct Sandbox {
+pub struct Sandbox<R: Rng> {
     pub width: usize,
     pub height: usize,
     pub pixels: Vec<PixelContainer>,
-    pub rng: rand::rngs::ThreadRng,
-    fps_start_time: time::Instant,
-    fps_frames: usize,
-    fps: f64,
+    rng: R,
 }
 
-impl Sandbox {
-    pub fn new(width: usize, height: usize) -> Self {
+impl<R: Rng> Sandbox<R> {
+    fn new_with_rng(width: usize, height: usize, rng: R) -> Sandbox<R> {
         Self {
             width,
             height,
             pixels: vec![PixelContainer::default(); width * height],
-            rng: rand::thread_rng(),
-            fps_start_time: time::Instant::now(),
-            fps_frames: 0,
-            fps: 0.0,
+            rng,
         }
+    }
+
+    pub fn new(width: usize, height: usize) -> Sandbox<SmallRng> {
+        Sandbox::new_with_rng(width, height, SmallRng::from_entropy())
+    }
+
+    pub(crate) fn rng(&mut self) -> &mut R {
+        &mut self.rng
     }
 
     pub fn coordinates_to_index(&self, x: usize, y: usize) -> usize {
@@ -123,20 +127,6 @@ impl Sandbox {
         }
     }
 
-    fn track_fps(&mut self) {
-        self.fps_frames += 1;
-        let elapsed = (time::Instant::now() - self.fps_start_time).as_millis();
-        if elapsed >= 1000 {
-            self.fps = self.fps_frames as f64 / elapsed as f64 * 1000.0;
-            self.fps_frames = 0;
-            self.fps_start_time = time::Instant::now();
-        }
-    }
-
-    pub fn fps(&self) -> f64 {
-        self.fps
-    }
-
     pub fn tick(&mut self) {
         for idx in (0..self.pixels.len() - 1).rev() {
             let pixel = self.pixels.get(idx).unwrap();
@@ -191,14 +181,13 @@ impl Sandbox {
         }
 
         self.pixels.iter_mut().for_each(|p| p.mark_is_moved(false));
-        self.track_fps();
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
         let width_delta = width as isize - self.width as isize;
         let height_delta = height as isize - self.height as isize;
 
-        let mut new_sandbox = Sandbox::new(width, height);
+        let mut new_sandbox = Sandbox::<SmallRng>::new(width, height);
         self.pixels.iter().enumerate().for_each(|(idx, p)| {
             let (x, y) = self.index_to_coordinates(idx);
             let new_x = x as isize + width_delta / 2;
@@ -216,20 +205,26 @@ impl Sandbox {
 
 #[cfg(test)]
 mod test {
+    use rand::rngs::mock::StepRng;
+
     use crate::pixel::sand::Sand;
     use crate::pixel::water::Water;
     use crate::sandbox::Sandbox;
 
+    fn new_rng() -> StepRng {
+        StepRng::new(42, 1)
+    }
+
     #[test]
     fn test_sandbox_creation() {
         // create a sandbox
-        let sandbox = Sandbox::new(3, 3);
+        let sandbox = Sandbox::new_with_rng(3, 3, new_rng());
         assert_eq!(sandbox.pixels.len(), 9);
     }
     #[test]
     fn test_sandbox_tick() {
         // create a sandbox
-        let mut sandbox = Sandbox::new(3, 3);
+        let mut sandbox = Sandbox::new_with_rng(3, 3, new_rng());
         sandbox.place_pixel_force(Sand.into(), 1, 0);
         sandbox.tick();
         let new_cord = sandbox.coordinates_to_index(1, 1);
@@ -241,7 +236,7 @@ mod test {
     #[test]
     fn test_sandbox_tick2() {
         // create a sandbox
-        let mut sandbox = Sandbox::new(3, 3);
+        let mut sandbox = Sandbox::new_with_rng(3, 3, new_rng());
         sandbox.place_pixel_force(Sand.into(), 1, 0);
         sandbox.place_pixel_force(Water::default().into(), 1, 1);
         sandbox.tick();
@@ -275,10 +270,11 @@ mod test {
             &sandbox.pixels
         );
     }
+
     #[test]
     fn test_sandbox_tick3() {
         // create a sandbox
-        let mut sandbox = Sandbox::new(3, 4);
+        let mut sandbox = Sandbox::new_with_rng(3, 4, new_rng());
         sandbox.place_pixel_force(Sand.into(), 1, 1);
         sandbox.place_pixel_force(Sand.into(), 1, 2);
         sandbox.place_pixel_force(Water::default().into(), 0, 3);

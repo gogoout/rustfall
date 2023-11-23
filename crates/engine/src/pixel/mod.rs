@@ -142,8 +142,13 @@ pub trait PixelFundamental {
         None
     }
 
-    fn tick_move(&self, x: usize, y: usize, sandbox: &mut Sandbox) -> Option<(usize, usize)> {
-        let check_density = |sandbox: &Sandbox, density, dir: Direction, reverse: bool| {
+    fn tick_move<R: Rng>(
+        &self,
+        x: usize,
+        y: usize,
+        sandbox: &mut Sandbox<R>,
+    ) -> Option<(usize, usize)> {
+        let check_density = |sandbox: &Sandbox<R>, density, dir: Direction, reverse: bool| {
             sandbox
                 .get_neighbour_pixel(x, y, dir)
                 .and_then(|(x, y, p)| match p.is_moved() {
@@ -165,13 +170,13 @@ pub trait PixelFundamental {
         };
 
         match self.pixel_type() {
-            PixelType::Gas(density) => Direction::gas_directions(&mut sandbox.rng)
+            PixelType::Gas(density) => Direction::gas_directions(sandbox.rng())
                 .iter()
                 .find_map(|dir| check_density(sandbox, density, *dir, true)),
-            PixelType::Liquid(density) => Direction::liquid_directions(&mut sandbox.rng)
+            PixelType::Liquid(density) => Direction::liquid_directions(sandbox.rng())
                 .iter()
                 .find_map(|dir| check_density(sandbox, density, *dir, false)),
-            PixelType::Solid(density) => Direction::solid_directions(&mut sandbox.rng)
+            PixelType::Solid(density) => Direction::solid_directions(sandbox.rng())
                 .iter()
                 .find_map(|dir| check_density(sandbox, density, *dir, false)),
             PixelType::Wall | PixelType::Void => None,

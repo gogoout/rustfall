@@ -12,3 +12,4 @@ crossterm.workspace=true
 ratatui.workspace=true
 itertools.workspace=true
 strum.workspace=true
+rand.workspace=true

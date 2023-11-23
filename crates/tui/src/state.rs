@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use rand::rngs::SmallRng;
 use strum::IntoEnumIterator;
 
 use crate::event::Event;
@@ -11,7 +12,7 @@ use engine::sandbox::Sandbox;
 pub struct State {
     /// should the application exit?
     pub should_quit: bool,
-    pub sandbox: Sandbox,
+    pub sandbox: Sandbox<SmallRng>,
     pub active_pixel: Pixel,
     no_braille: bool,
     mouse_down_event: Option<MouseEvent>,
@@ -25,7 +26,7 @@ impl State {
 
         Self {
             should_quit: false,
-            sandbox: Sandbox::new(width, height),
+            sandbox: Sandbox::<SmallRng>::new(width, height),
             active_pixel: Default::default(),
             no_braille,
             mouse_down_event: None,
