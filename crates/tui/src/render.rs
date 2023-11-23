@@ -7,7 +7,7 @@ use rand::Rng;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::prelude::Marker;
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::block::Title;
+use ratatui::widgets::block::{Position, Title};
 use ratatui::widgets::canvas::{Canvas, Painter, Shape};
 use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::{
@@ -75,6 +75,14 @@ impl Renderer {
                         .title(
                             Title::from(format!("{:.2} fps", self.fps_tracker.fps()))
                                 .alignment(Alignment::Right),
+                        )
+                        .title(
+                            Title::from(match state.pause {
+                                true => "Paused",
+                                false => "Press `Space` to pause",
+                            })
+                            .position(Position::Bottom)
+                            .alignment(Alignment::Center),
                         ),
                 )
                 .marker(match self.no_braille {

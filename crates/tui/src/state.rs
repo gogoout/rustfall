@@ -16,7 +16,7 @@ pub struct State {
     pub active_pixel: Pixel,
     no_braille: bool,
     mouse_down_event: Option<MouseEvent>,
-    pause: bool,
+    pub pause: bool,
 }
 
 impl State {
