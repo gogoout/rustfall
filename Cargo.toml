@@ -1,19 +1,20 @@
-[package]
-name = "rustfall"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members=[
+    "crates/engine",
+    "crates/tui"
+]
+resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.75"
 crossterm = "0.27.0"
 enum_dispatch = "0.3.12"
 itertools = "0.12.0"
-rand = { version = "0.8.5", features = ["small_rng"] }
+rand = "0.8.5"
 ratatui = "0.24.0"
 strum = "0.25.0"
 strum_macros = "0.25.3"
-
-[dev-dependencies]
 criterion = "0.5.1"
+

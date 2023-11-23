@@ -1,6 +1,6 @@
-use crate::engine::pixel::ice::Ice;
-use crate::engine::pixel::steam::Steam;
-use crate::engine::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::ice::Ice;
+use crate::pixel::steam::Steam;
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Water {

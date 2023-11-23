@@ -1,5 +1,5 @@
-use crate::engine::pixel::fire::Fire;
-use crate::engine::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::fire::Fire;
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct Void {

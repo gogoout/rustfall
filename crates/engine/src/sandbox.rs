@@ -1,4 +1,4 @@
-use crate::engine::pixel::{Direction, Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{Direction, Pixel, PixelFundamental, PixelInteract, PixelType};
 use std::time;
 
 #[derive(Debug, Default, Clone)]
@@ -216,9 +216,9 @@ impl Sandbox {
 
 #[cfg(test)]
 mod test {
-    use crate::engine::pixel::sand::Sand;
-    use crate::engine::pixel::water::Water;
-    use crate::engine::sandbox::Sandbox;
+    use crate::pixel::sand::Sand;
+    use crate::pixel::water::Water;
+    use crate::sandbox::Sandbox;
 
     #[test]
     fn test_sandbox_creation() {

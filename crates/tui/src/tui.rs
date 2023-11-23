@@ -7,9 +7,9 @@ use crossterm::{
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
-use crate::display::event::{Event, EventHandler};
-use crate::display::render::Renderer;
-use crate::display::state::State;
+use crate::event::{Event, EventHandler};
+use crate::render::Renderer;
+use crate::state::State;
 
 pub type CrosstermTerminal = Terminal<CrosstermBackend<io::Stderr>>;
 

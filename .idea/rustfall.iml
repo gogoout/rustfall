@@ -4,6 +4,8 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/benches" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/engine/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tui/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.tmp" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/temp" />

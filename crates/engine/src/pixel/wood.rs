@@ -1,5 +1,5 @@
-use crate::engine::pixel::void::Void;
-use crate::engine::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::void::Void;
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Wood {

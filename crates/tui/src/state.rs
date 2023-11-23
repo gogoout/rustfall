@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use strum::IntoEnumIterator;
 
-use crate::display::event::Event;
-use crate::display::render::Renderer;
-use crate::engine::pixel::Pixel;
-use crate::engine::sandbox::Sandbox;
+use crate::event::Event;
+use crate::render::Renderer;
+use engine::pixel::Pixel;
+use engine::sandbox::Sandbox;
 
 /// Application.
 #[derive(Debug)]

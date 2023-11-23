@@ -1,4 +1,4 @@
-use crate::engine::pixel::{PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct Sand;

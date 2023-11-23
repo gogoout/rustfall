@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::OnceLock;
 
 use itertools::Itertools;
@@ -15,9 +16,9 @@ use ratatui::{
 };
 use strum::IntoEnumIterator;
 
-use crate::display::state::{PixelHotkey, State};
-use crate::engine::pixel::{Pixel, PixelFundamental};
-use crate::engine::sandbox::Sandbox;
+use crate::state::{PixelHotkey, State};
+use engine::pixel::{Pixel, PixelFundamental};
+use engine::sandbox::Sandbox;
 
 pub struct Renderer {
     no_braille: bool,
@@ -73,7 +74,7 @@ impl Renderer {
                     true => Marker::Block,
                 })
                 .paint(|ctx| {
-                    ctx.draw(&state.sandbox);
+                    ctx.draw(&TuiSandbox(&state.sandbox));
                 }),
             layout[0],
         );
@@ -144,7 +145,16 @@ impl PixelDisplay for Pixel {
     }
 }
 
-impl Shape for Sandbox {
+struct TuiSandbox<'a>(&'a Sandbox);
+impl Deref for TuiSandbox<'_> {
+    type Target = Sandbox;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl Shape for TuiSandbox<'_> {
     fn draw(&self, painter: &mut Painter) {
         for (idx, pixel) in self.pixels.iter().enumerate() {
             if let Pixel::Void(_) = pixel.pixel() {
