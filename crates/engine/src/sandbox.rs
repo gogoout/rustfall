@@ -110,20 +110,20 @@ impl<R: Rng> Sandbox<R> {
                     .map(|p| (x, y, p))
             })
     }
-    pub fn place_pixel(&mut self, pixel: Pixel, x: usize, y: usize) {
+    pub fn place_pixel<P: Into<Pixel>>(&mut self, pixel: P, x: usize, y: usize) {
         let index = self.coordinates_to_index(x, y);
         if let Some(p) = self.pixels.get_mut(index) {
             if p.pixel.pixel_type() != PixelType::Void {
                 return;
             }
-            *p = PixelContainer::new(pixel);
+            *p = PixelContainer::new(pixel.into());
         }
     }
 
-    pub fn place_pixel_force(&mut self, pixel: Pixel, x: usize, y: usize) {
+    pub fn place_pixel_force<P: Into<Pixel>>(&mut self, pixel: P, x: usize, y: usize) {
         let index = self.coordinates_to_index(x, y);
         if let Some(p) = self.pixels.get_mut(index) {
-            *p = PixelContainer::new(pixel);
+            *p = PixelContainer::new(pixel.into());
         }
     }
 
@@ -225,7 +225,7 @@ mod test {
     fn test_sandbox_tick() {
         // create a sandbox
         let mut sandbox = Sandbox::new_with_rng(3, 3, new_rng());
-        sandbox.place_pixel_force(Sand.into(), 1, 0);
+        sandbox.place_pixel_force(Sand, 1, 0);
         sandbox.tick();
         let new_cord = sandbox.coordinates_to_index(1, 1);
         assert_eq!(sandbox.pixels[new_cord].pixel, Sand.into());
@@ -237,8 +237,8 @@ mod test {
     fn test_sandbox_tick2() {
         // create a sandbox
         let mut sandbox = Sandbox::new_with_rng(3, 3, new_rng());
-        sandbox.place_pixel_force(Sand.into(), 1, 0);
-        sandbox.place_pixel_force(Water::default().into(), 1, 1);
+        sandbox.place_pixel_force(Sand, 1, 0);
+        sandbox.place_pixel_force(Water::default(), 1, 1);
         sandbox.tick();
         let sand_new_cord = sandbox.coordinates_to_index(1, 1);
         let water_new_cord = sandbox.coordinates_to_index(1, 2);
@@ -275,11 +275,11 @@ mod test {
     fn test_sandbox_tick3() {
         // create a sandbox
         let mut sandbox = Sandbox::new_with_rng(3, 4, new_rng());
-        sandbox.place_pixel_force(Sand.into(), 1, 1);
-        sandbox.place_pixel_force(Sand.into(), 1, 2);
-        sandbox.place_pixel_force(Water::default().into(), 0, 3);
-        sandbox.place_pixel_force(Water::default().into(), 1, 3);
-        sandbox.place_pixel_force(Water::default().into(), 2, 3);
+        sandbox.place_pixel_force(Sand, 1, 1);
+        sandbox.place_pixel_force(Sand, 1, 2);
+        sandbox.place_pixel_force(Water::default(), 0, 3);
+        sandbox.place_pixel_force(Water::default(), 1, 3);
+        sandbox.place_pixel_force(Water::default(), 2, 3);
         sandbox.tick();
         let sand1_new_cord = sandbox.coordinates_to_index(0, 2);
         let sand2_new_cord = sandbox.coordinates_to_index(1, 3);

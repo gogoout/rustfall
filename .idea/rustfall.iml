@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/engine/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/tui/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/engine/benches" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/.tmp" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/temp" />
