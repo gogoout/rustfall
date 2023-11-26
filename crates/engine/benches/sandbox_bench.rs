@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::rngs::SmallRng;
 use rustfall_engine::pixel::steam::Steam;
 use rustfall_engine::pixel::water::Water;
@@ -9,7 +9,7 @@ pub fn liquid_benchmark(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let mut duration = std::time::Duration::new(0, 0);
             for _ in 0..iters {
-                let mut sandbox = black_box(Sandbox::<SmallRng>::new(200, 200));
+                let mut sandbox = Sandbox::<SmallRng>::new(200, 200);
                 for i in 50..150 {
                     sandbox.place_pixel_force(Water::default(), i, 0);
                 }
@@ -29,7 +29,7 @@ pub fn gas_benchmark(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let mut duration = std::time::Duration::new(0, 0);
             for _ in 0..iters {
-                let mut sandbox = black_box(Sandbox::<SmallRng>::new(200, 200));
+                let mut sandbox = Sandbox::<SmallRng>::new(200, 200);
                 for i in 50..150 {
                     sandbox.place_pixel_force(Steam::default(), i, 199);
                 }

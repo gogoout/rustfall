@@ -17,6 +17,9 @@ strum_macros.workspace=true
 criterion.workspace=true
 
 
+[lib]
+bench = false
+
 [[bench]]
 name = "sandbox_bench"
 harness = false
