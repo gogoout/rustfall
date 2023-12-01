@@ -6,42 +6,36 @@ use rustfall_engine::sandbox::Sandbox;
 
 pub fn liquid_benchmark(c: &mut Criterion) {
     c.bench_function("liquid tick", |b| {
-        b.iter_custom(|iters| {
-            let mut duration = std::time::Duration::new(0, 0);
-            for _ in 0..iters {
+        b.iter_batched_ref(
+            || {
                 let mut sandbox = Sandbox::<SmallRng>::new(200, 200);
                 for i in 50..150 {
                     sandbox.place_pixel_force(Water::default(), i, 0);
                 }
-
-                let start = std::time::Instant::now();
-                for _ in 0..200 {
-                    sandbox.tick();
-                }
-                duration += start.elapsed();
-            }
-            duration
-        })
+                sandbox
+            },
+            |sandbox| {
+                sandbox.tick();
+            },
+            criterion::BatchSize::NumIterations(200),
+        );
     });
 }
 pub fn gas_benchmark(c: &mut Criterion) {
     c.bench_function("gas tick", |b| {
-        b.iter_custom(|iters| {
-            let mut duration = std::time::Duration::new(0, 0);
-            for _ in 0..iters {
+        b.iter_batched_ref(
+            || {
                 let mut sandbox = Sandbox::<SmallRng>::new(200, 200);
                 for i in 50..150 {
                     sandbox.place_pixel_force(Steam::default(), i, 199);
                 }
-
-                let start = std::time::Instant::now();
-                for _ in 0..200 {
-                    sandbox.tick();
-                }
-                duration += start.elapsed();
-            }
-            duration
-        })
+                sandbox
+            },
+            |sandbox| {
+                sandbox.tick();
+            },
+            criterion::BatchSize::NumIterations(200),
+        );
     });
 }
 

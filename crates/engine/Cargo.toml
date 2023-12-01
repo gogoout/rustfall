@@ -23,3 +23,7 @@ bench = false
 [[bench]]
 name = "sandbox_bench"
 harness = false
+
+[[bench]]
+name = "vec_bench"
+harness = false
