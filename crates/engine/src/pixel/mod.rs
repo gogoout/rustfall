@@ -215,3 +215,32 @@ impl Display for Pixel {
         write!(f, "{}", self.name())
     }
 }
+
+#[derive(Debug, Default, Clone)]
+pub struct PixelContainer {
+    pixel: Pixel,
+    is_moved: bool,
+}
+
+impl PixelContainer {
+    pub fn new(pixel: Pixel) -> Self {
+        Self {
+            pixel,
+            is_moved: false,
+        }
+    }
+
+    pub fn pixel(&self) -> Pixel {
+        self.pixel
+    }
+    pub fn pixel_mut(&mut self) -> &mut Pixel {
+        &mut self.pixel
+    }
+    pub fn is_moved(&self) -> bool {
+        self.is_moved
+    }
+
+    pub fn mark_is_moved(&mut self, flag: bool) {
+        self.is_moved = flag;
+    }
+}

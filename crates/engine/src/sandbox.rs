@@ -1,71 +1,22 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use crate::pixel::{Direction, Pixel, PixelFundamental, PixelInteract, PixelType};
-
-#[derive(Debug, Default, Clone)]
-pub struct PixelContainer {
-    pixel: Pixel,
-    is_moved: bool,
-}
-
-impl PixelContainer {
-    fn new(pixel: Pixel) -> Self {
-        Self {
-            pixel,
-            is_moved: false,
-        }
-    }
-
-    pub fn pixel(&self) -> Pixel {
-        self.pixel
-    }
-    pub fn pixel_mut(&mut self) -> &mut Pixel {
-        &mut self.pixel
-    }
-    pub fn is_moved(&self) -> bool {
-        self.is_moved
-    }
-
-    pub fn mark_is_moved(&mut self, flag: bool) {
-        self.is_moved = flag;
-    }
-}
+use crate::pixel::{Direction, Pixel, PixelContainer, PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug)]
-pub struct Sandbox<R: Rng> {
+pub struct Sandbox {
     pub width: usize,
     pub height: usize,
-    pub pixels: Vec<PixelContainer>,
-    rng: R,
+    pub pixels: Vec<Vec<PixelContainer>>,
 }
 
-impl<R: Rng> Sandbox<R> {
-    fn new_with_rng(width: usize, height: usize, rng: R) -> Sandbox<R> {
+impl Sandbox {
+    pub fn new(width: usize, height: usize) -> Sandbox {
         Self {
             width,
             height,
-            pixels: vec![PixelContainer::default(); width * height],
-            rng,
+            pixels: vec![vec![PixelContainer::default(); height]; width],
         }
-    }
-
-    pub fn new(width: usize, height: usize) -> Sandbox<SmallRng> {
-        Sandbox::new_with_rng(width, height, SmallRng::from_entropy())
-    }
-
-    pub(crate) fn rng(&mut self) -> &mut R {
-        &mut self.rng
-    }
-
-    pub fn coordinates_to_index(&self, x: usize, y: usize) -> usize {
-        x + y * self.width
-    }
-
-    pub fn index_to_coordinates(&self, index: usize) -> (usize, usize) {
-        let x = index % self.width;
-        let y = index / self.width;
-        (x, y)
     }
 
     pub fn is_coordinate_in_bound(&self, x: usize, y: usize) -> bool {
@@ -104,16 +55,19 @@ impl<R: Rng> Sandbox<R> {
         dir: Direction,
     ) -> Option<(usize, usize, &PixelContainer)> {
         self.get_neighbour_coordinates(x, y, dir)
-            .and_then(|(x, y)| {
-                self.pixels
-                    .get(self.coordinates_to_index(x, y))
-                    .map(|p| (x, y, p))
-            })
+            .and_then(|(x, y)| self.get_pixel(x, y).map(|p| (x, y, p)))
     }
+
+    pub fn get_pixel(&self, x: usize, y: usize) -> Option<&PixelContainer> {
+        self.pixels.get(x).and_then(|p| p.get(y))
+    }
+    pub fn get_pixel_mut(&mut self, x: usize, y: usize) -> Option<&mut PixelContainer> {
+        self.pixels.get_mut(x).and_then(|p| p.get_mut(y))
+    }
+
     pub fn place_pixel<P: Into<Pixel>>(&mut self, pixel: P, x: usize, y: usize) {
-        let index = self.coordinates_to_index(x, y);
-        if let Some(p) = self.pixels.get_mut(index) {
-            if p.pixel.pixel_type() != PixelType::Void {
+        if let Some(p) = self.get_pixel_mut(x, y) {
+            if p.pixel().pixel_type() != PixelType::Void {
                 return;
             }
             *p = PixelContainer::new(pixel.into());
@@ -121,8 +75,7 @@ impl<R: Rng> Sandbox<R> {
     }
 
     pub fn place_pixel_force<P: Into<Pixel>>(&mut self, pixel: P, x: usize, y: usize) {
-        let index = self.coordinates_to_index(x, y);
-        if let Some(p) = self.pixels.get_mut(index) {
+        if let Some(p) = self.get_pixel_mut(x, y) {
             *p = PixelContainer::new(pixel.into());
         }
     }
@@ -265,53 +218,6 @@ mod test {
         );
         assert_eq!(
             sandbox.pixels[water_new_cord].pixel,
-            Water::default().into(),
-            "{:?}",
-            &sandbox.pixels
-        );
-    }
-
-    #[test]
-    fn test_sandbox_tick3() {
-        // create a sandbox
-        let mut sandbox = Sandbox::new_with_rng(3, 4, new_rng());
-        sandbox.place_pixel_force(Sand, 1, 1);
-        sandbox.place_pixel_force(Sand, 1, 2);
-        sandbox.place_pixel_force(Water::default(), 0, 3);
-        sandbox.place_pixel_force(Water::default(), 1, 3);
-        sandbox.place_pixel_force(Water::default(), 2, 3);
-        sandbox.tick();
-        let sand1_new_cord = sandbox.coordinates_to_index(0, 2);
-        let sand2_new_cord = sandbox.coordinates_to_index(1, 3);
-        let water1_new_cord = sandbox.coordinates_to_index(0, 3);
-        let water2_new_cord = sandbox.coordinates_to_index(1, 2);
-        let water3_new_cord = sandbox.coordinates_to_index(2, 3);
-        assert_eq!(
-            sandbox.pixels[sand1_new_cord].pixel,
-            Sand.into(),
-            "{:?}",
-            &sandbox.pixels
-        );
-        assert_eq!(
-            sandbox.pixels[sand2_new_cord].pixel,
-            Sand.into(),
-            "{:?}",
-            &sandbox.pixels
-        );
-        assert_eq!(
-            sandbox.pixels[water1_new_cord].pixel,
-            Water::default().into(),
-            "{:?}",
-            &sandbox.pixels
-        );
-        assert_eq!(
-            sandbox.pixels[water2_new_cord].pixel,
-            Water::default().into(),
-            "{:?}",
-            &sandbox.pixels
-        );
-        assert_eq!(
-            sandbox.pixels[water3_new_cord].pixel,
             Water::default().into(),
             "{:?}",
             &sandbox.pixels
