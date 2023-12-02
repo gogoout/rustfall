@@ -7,7 +7,7 @@ pub fn liquid_benchmark(c: &mut Criterion) {
     c.bench_function("liquid tick", |b| {
         b.iter_batched_ref(
             || {
-                let mut sandbox = Sandbox::new(200, 200);
+                let mut sandbox = Sandbox::new(300, 300);
                 for i in 50..150 {
                     sandbox.place_pixel_force(Water::default(), (i, 0));
                 }
@@ -24,7 +24,7 @@ pub fn gas_benchmark(c: &mut Criterion) {
     c.bench_function("gas tick", |b| {
         b.iter_batched_ref(
             || {
-                let mut sandbox = Sandbox::new(200, 200);
+                let mut sandbox = Sandbox::new(300, 300);
                 for i in 50..150 {
                     sandbox.place_pixel_force(Steam::default(), (i, 199));
                 }
