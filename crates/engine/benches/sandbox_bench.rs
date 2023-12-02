@@ -1,16 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::rngs::SmallRng;
 use rustfall_engine::pixel::steam::Steam;
 use rustfall_engine::pixel::water::Water;
-use rustfall_engine::sandbox::Sandbox;
+use rustfall_engine::sandbox::sandbox::Sandbox;
 
 pub fn liquid_benchmark(c: &mut Criterion) {
     c.bench_function("liquid tick", |b| {
         b.iter_batched_ref(
             || {
-                let mut sandbox = Sandbox::<SmallRng>::new(200, 200);
+                let mut sandbox = Sandbox::new(200, 200);
                 for i in 50..150 {
-                    sandbox.place_pixel_force(Water::default(), i, 0);
+                    sandbox.place_pixel_force(Water::default(), (i, 0));
                 }
                 sandbox
             },
@@ -25,9 +24,9 @@ pub fn gas_benchmark(c: &mut Criterion) {
     c.bench_function("gas tick", |b| {
         b.iter_batched_ref(
             || {
-                let mut sandbox = Sandbox::<SmallRng>::new(200, 200);
+                let mut sandbox = Sandbox::new(200, 200);
                 for i in 50..150 {
-                    sandbox.place_pixel_force(Steam::default(), i, 199);
+                    sandbox.place_pixel_force(Steam::default(), (i, 199));
                 }
                 sandbox
             },

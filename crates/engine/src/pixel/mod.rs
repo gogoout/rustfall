@@ -17,7 +17,7 @@ use crate::pixel::steam::Steam;
 use crate::pixel::void::Void;
 use crate::pixel::water::Water;
 use crate::pixel::wood::Wood;
-use crate::sandbox::Sandbox;
+use crate::sandbox::{Coordinate, SandboxControl};
 use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
 use rand::distributions::Distribution;
@@ -142,43 +142,42 @@ pub trait PixelFundamental {
         None
     }
 
-    fn tick_move<R: Rng>(
+    fn tick_move<Ctrl: SandboxControl, R: Rng>(
         &self,
-        x: usize,
-        y: usize,
-        sandbox: &mut Sandbox<R>,
-    ) -> Option<(usize, usize)> {
-        let check_density = |sandbox: &Sandbox<R>, density, dir: Direction, reverse: bool| {
-            sandbox
-                .get_neighbour_pixel(x, y, dir)
-                .and_then(|(x, y, p)| match p.is_moved() {
+        cord: Coordinate,
+        ctrl: &Ctrl,
+        rng: &mut R,
+    ) -> Option<Coordinate> {
+        let check_density = |density, dir: Direction, reverse: bool| {
+            ctrl.get_neighbour_pixel(cord, dir)
+                .and_then(|(new_cord, p)| match p.is_moved() {
                     true => None,
-                    false => Some((x, y, p.pixel().pixel_type())),
+                    false => Some((new_cord, p.pixel().pixel_type())),
                 })
-                .and_then(|(x, y, p)| match p {
+                .and_then(|(new_cord, p)| match p {
                     PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
                         match (density == td, density > td, reverse) {
                             (true, _, _) => None,
-                            (false, true, false) => Some((x, y)),
-                            (false, false, true) => Some((x, y)),
+                            (false, true, false) => Some(new_cord),
+                            (false, false, true) => Some(new_cord),
                             _ => None,
                         }
                     }
                     PixelType::Wall => None,
-                    PixelType::Void => Some((x, y)),
+                    PixelType::Void => Some(new_cord),
                 })
         };
 
         match self.pixel_type() {
-            PixelType::Gas(density) => Direction::gas_directions(sandbox.rng())
+            PixelType::Gas(density) => Direction::gas_directions(rng)
                 .iter()
-                .find_map(|dir| check_density(sandbox, density, *dir, true)),
-            PixelType::Liquid(density) => Direction::liquid_directions(sandbox.rng())
+                .find_map(|dir| check_density(density, *dir, true)),
+            PixelType::Liquid(density) => Direction::liquid_directions(rng)
                 .iter()
-                .find_map(|dir| check_density(sandbox, density, *dir, false)),
-            PixelType::Solid(density) => Direction::solid_directions(sandbox.rng())
+                .find_map(|dir| check_density(density, *dir, false)),
+            PixelType::Solid(density) => Direction::solid_directions(rng)
                 .iter()
-                .find_map(|dir| check_density(sandbox, density, *dir, false)),
+                .find_map(|dir| check_density(density, *dir, false)),
             PixelType::Wall | PixelType::Void => None,
         }
     }
@@ -216,14 +215,14 @@ impl Display for Pixel {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct PixelContainer {
-    pixel: Pixel,
-    is_moved: bool,
+    pub(crate) pixel: Pixel,
+    pub(crate) is_moved: bool,
 }
 
 impl PixelContainer {
-    pub fn new(pixel: Pixel) -> Self {
+    pub(crate) fn new(pixel: Pixel) -> Self {
         Self {
             pixel,
             is_moved: false,

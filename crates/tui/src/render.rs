@@ -3,7 +3,6 @@ use std::sync::OnceLock;
 
 use engine::fps_tracker::FpsTracker;
 use itertools::Itertools;
-use rand::Rng;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout};
 use ratatui::prelude::Marker;
 use ratatui::style::{Modifier, Style};
@@ -20,7 +19,7 @@ use strum::IntoEnumIterator;
 
 use crate::state::{PixelHotkey, State};
 use engine::pixel::{Pixel, PixelFundamental};
-use engine::sandbox::Sandbox;
+use engine::sandbox::sandbox::Sandbox;
 
 pub struct Renderer {
     no_braille: bool,
@@ -161,23 +160,24 @@ impl PixelDisplay for Pixel {
     }
 }
 
-struct TuiSandbox<'a, R: Rng>(&'a Sandbox<R>);
-impl<R: Rng> Deref for TuiSandbox<'_, R> {
-    type Target = Sandbox<R>;
+struct TuiSandbox<'a>(&'a Sandbox);
+impl Deref for TuiSandbox<'_> {
+    type Target = Sandbox;
 
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl<R: Rng> Shape for TuiSandbox<'_, R> {
+impl Shape for TuiSandbox<'_> {
     fn draw(&self, painter: &mut Painter) {
-        for (idx, pixel) in self.pixels.iter().enumerate() {
-            if let Pixel::Void(_) = pixel.pixel() {
-                continue;
+        for (x, y_axel) in self.pixels.iter().enumerate() {
+            for (y, pixel) in y_axel.iter().enumerate() {
+                if let Pixel::Void(_) = pixel.pixel() {
+                    continue;
+                }
+                painter.paint(x, y, pixel.pixel().display());
             }
-            let (x, y) = self.index_to_coordinates(idx);
-            painter.paint(x, y, pixel.pixel().display());
         }
     }
 }

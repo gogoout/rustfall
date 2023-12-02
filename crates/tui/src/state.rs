@@ -1,18 +1,17 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
-use rand::rngs::SmallRng;
 use strum::IntoEnumIterator;
 
 use crate::event::Event;
 use crate::render::Renderer;
 use engine::pixel::Pixel;
-use engine::sandbox::Sandbox;
+use engine::sandbox::sandbox::Sandbox;
 
 /// Application.
 #[derive(Debug)]
 pub struct State {
     /// should the application exit?
     pub should_quit: bool,
-    pub sandbox: Sandbox<SmallRng>,
+    pub sandbox: Sandbox,
     pub active_pixel: Pixel,
     no_braille: bool,
     mouse_down_event: Option<MouseEvent>,
@@ -26,7 +25,7 @@ impl State {
 
         Self {
             should_quit: false,
-            sandbox: Sandbox::<SmallRng>::new(width, height),
+            sandbox: Sandbox::new(width, height),
             active_pixel: Default::default(),
             no_braille,
             mouse_down_event: None,
@@ -131,8 +130,8 @@ impl State {
         }
 
         match self.active_pixel {
-            Pixel::Void(_) => self.sandbox.place_pixel_force(self.active_pixel, x, y),
-            _ => self.sandbox.place_pixel(self.active_pixel, x, y),
+            Pixel::Void(_) => self.sandbox.place_pixel_force(self.active_pixel, (x, y)),
+            _ => self.sandbox.place_pixel(self.active_pixel, (x, y)),
         }
     }
 }
