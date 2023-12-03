@@ -1,13 +1,17 @@
 use crate::pixel::water::Water;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Steam {
     temp: u8,
+    state: PixelState,
 }
 impl Default for Steam {
     fn default() -> Self {
-        Self { temp: 200 }
+        Self {
+            temp: 200,
+            state: Default::default(),
+        }
     }
 }
 
@@ -18,6 +22,14 @@ impl PixelFundamental for Steam {
 
     fn pixel_type(&self) -> PixelType {
         PixelType::Gas(-10)
+    }
+
+    fn state(&self) -> &PixelState {
+        &self.state
+    }
+
+    fn state_mut(&mut self) -> &mut PixelState {
+        &mut self.state
     }
     fn update(&mut self) -> Option<Pixel> {
         if self.temp < 10 {

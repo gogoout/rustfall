@@ -132,11 +132,75 @@ impl Direction {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PixelState {
+    pub(crate) is_moved: bool,
+    pub(crate) velocity: (i16, i16),
+}
+
+const MAX_VELOCITY: i16 = 5000;
+const MIX_VELOCITY: i16 = -5000;
+
+impl PixelState {
+    pub fn is_moved(&self) -> bool {
+        self.is_moved
+    }
+    pub fn mark_is_moved(&mut self, flag: bool) {
+        self.is_moved = flag;
+    }
+
+    pub fn update_velocity(&mut self, velocity: (i16, i16)) {
+        let (x, y) = velocity;
+
+        self.velocity = (
+            x.min(MIX_VELOCITY).max(MAX_VELOCITY),
+            y.min(MIX_VELOCITY).max(MAX_VELOCITY),
+        );
+    }
+
+    pub fn update_velocity_x(&mut self, vx: i16) {
+        self.velocity.0 = vx.min(MIX_VELOCITY).max(MAX_VELOCITY);
+    }
+
+    pub fn update_velocity_y(&mut self, vy: i16) {
+        self.velocity.1 = vy.min(MIX_VELOCITY).max(MAX_VELOCITY);
+    }
+
+    pub fn update_velocity_y_with_gravity(&mut self) {
+        const GRAVITY: i16 = 15;
+        self.update_velocity_y(self.velocity.1 + GRAVITY);
+    }
+
+    pub fn update_velocity_x_with_friction(&mut self, friction: i16) {
+        match self.velocity.0 {
+            x if x > 0 => self.velocity.0 = (self.velocity.0 - friction).min(0),
+            x if x < 0 => self.velocity.0 = (self.velocity.0 + friction).max(0),
+            _ => {}
+        }
+    }
+
+    pub fn calculate_target_coordinate(&self, cord: Coordinate) -> Coordinate {
+        let (x, y) = cord;
+        let (vx, vy) = self.velocity;
+        let (vx, vy) = (vx / 1000, vy / 1000);
+        let x = (vx as i32 + x as i32).min(0) as usize;
+        let y = (vy as i32 + y as i32).min(0) as usize;
+        (x, y)
+    }
+}
+
 #[enum_dispatch]
 pub trait PixelFundamental {
     fn name(&self) -> &'static str;
 
     fn pixel_type(&self) -> PixelType;
+
+    fn friction(&self) -> i16 {
+        0
+    }
+
+    fn state(&self) -> &PixelState;
+    fn state_mut(&mut self) -> &mut PixelState;
 
     fn update(&mut self) -> Option<Pixel> {
         None
@@ -169,15 +233,15 @@ pub trait PixelFundamental {
         };
 
         match self.pixel_type() {
-            PixelType::Gas(density) => Direction::gas_directions(rng)
-                .iter()
-                .find_map(|dir| check_density(density, *dir, true)),
-            PixelType::Liquid(density) => Direction::liquid_directions(rng)
-                .iter()
-                .find_map(|dir| check_density(density, *dir, false)),
             PixelType::Solid(density) => Direction::solid_directions(rng)
                 .iter()
                 .find_map(|dir| check_density(density, *dir, false)),
+            PixelType::Liquid(density) => Direction::liquid_directions(rng)
+                .iter()
+                .find_map(|dir| check_density(density, *dir, false)),
+            PixelType::Gas(density) => Direction::gas_directions(rng)
+                .iter()
+                .find_map(|dir| check_density(density, *dir, true)),
             PixelType::Wall | PixelType::Void => None,
         }
     }
@@ -212,34 +276,5 @@ impl Default for Pixel {
 impl Display for Pixel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name())
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct PixelContainer {
-    pub(crate) pixel: Pixel,
-    pub(crate) is_moved: bool,
-}
-
-impl PixelContainer {
-    pub(crate) fn new(pixel: Pixel) -> Self {
-        Self {
-            pixel,
-            is_moved: false,
-        }
-    }
-
-    pub fn pixel(&self) -> Pixel {
-        self.pixel
-    }
-    pub fn pixel_mut(&mut self) -> &mut Pixel {
-        &mut self.pixel
-    }
-    pub fn is_moved(&self) -> bool {
-        self.is_moved
-    }
-
-    pub fn mark_is_moved(&mut self, flag: bool) {
-        self.is_moved = flag;
     }
 }

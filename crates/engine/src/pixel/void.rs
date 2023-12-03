@@ -1,9 +1,10 @@
 use crate::pixel::fire::Fire;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct Void {
     burn: bool,
+    state: PixelState,
 }
 
 impl PixelFundamental for Void {
@@ -13,6 +14,14 @@ impl PixelFundamental for Void {
 
     fn pixel_type(&self) -> PixelType {
         PixelType::Void
+    }
+
+    fn state(&self) -> &PixelState {
+        &self.state
+    }
+
+    fn state_mut(&mut self) -> &mut PixelState {
+        &mut self.state
     }
 
     fn update(&mut self) -> Option<Pixel> {

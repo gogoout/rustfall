@@ -1,15 +1,20 @@
 use crate::pixel::void::Void;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Wood {
     pub temp: u8,
     pub life: u8,
+    state: PixelState,
 }
 
 impl Default for Wood {
     fn default() -> Self {
-        Self { temp: 0, life: 225 }
+        Self {
+            temp: 0,
+            life: 225,
+            state: Default::default(),
+        }
     }
 }
 
@@ -30,6 +35,14 @@ impl PixelFundamental for Wood {
         } else {
             PixelType::Wall
         }
+    }
+
+    fn state(&self) -> &PixelState {
+        &self.state
+    }
+
+    fn state_mut(&mut self) -> &mut PixelState {
+        &mut self.state
     }
 
     fn update(&mut self) -> Option<Pixel> {

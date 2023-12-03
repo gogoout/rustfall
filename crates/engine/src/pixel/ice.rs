@@ -1,9 +1,10 @@
 use crate::pixel::water::Water;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct Ice {
     pub temp: u8,
+    state: PixelState,
 }
 
 impl Ice {
@@ -19,6 +20,14 @@ impl PixelFundamental for Ice {
 
     fn pixel_type(&self) -> PixelType {
         PixelType::Wall
+    }
+
+    fn state(&self) -> &PixelState {
+        &self.state
+    }
+
+    fn state_mut(&mut self) -> &mut PixelState {
+        &mut self.state
     }
 
     fn update(&mut self) -> Option<Pixel> {

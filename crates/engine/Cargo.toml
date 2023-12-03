@@ -13,6 +13,7 @@ rand = { workspace=true, features = ["small_rng"] }
 strum.workspace=true
 strum_macros.workspace=true
 rayon.workspace=true
+line_drawing.workspace=true
 
 [dev-dependencies]
 criterion.workspace=true
