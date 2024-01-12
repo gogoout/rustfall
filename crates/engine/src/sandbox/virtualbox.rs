@@ -1,23 +1,23 @@
 use itertools::Either;
 use rand::thread_rng;
 
-use crate::pixel::{PixelContainer, PixelFundamental, PixelType};
+use crate::pixel::{Pixel, PixelFundamental, PixelType};
 use crate::sandbox::SandboxControl;
 
 pub(crate) struct VirtualBox<'a> {
     pub offset: usize,
     pub virtual_width: usize,
     pub height: usize,
-    pub pixels: &'a mut [Vec<PixelContainer>],
+    pub pixels: &'a mut [Vec<Pixel>],
     ltr: bool,
 }
 
 impl SandboxControl for VirtualBox<'_> {
-    fn matrix(&self) -> &[Vec<PixelContainer>] {
+    fn matrix(&self) -> &[Vec<Pixel>] {
         self.pixels
     }
 
-    fn matrix_mut(&mut self) -> &mut [Vec<PixelContainer>] {
+    fn matrix_mut(&mut self) -> &mut [Vec<Pixel>] {
         self.pixels
     }
 
@@ -35,7 +35,7 @@ impl<'a> VirtualBox<'a> {
         offset: usize,
         virtual_width: usize,
         height: usize,
-        pixels: &'a mut [Vec<PixelContainer>],
+        pixels: &'a mut [Vec<Pixel>],
         ltr: bool,
     ) -> Self {
         Self {

@@ -18,7 +18,7 @@ use ratatui::{
 use strum::IntoEnumIterator;
 
 use crate::state::{PixelHotkey, State};
-use engine::pixel::{Pixel, PixelFundamental};
+use engine::pixel::{PixelFundamental, PixelInstance};
 use engine::sandbox::sandbox::Sandbox;
 
 pub struct Renderer {
@@ -39,7 +39,7 @@ impl Renderer {
     fn list_items() -> &'static [ListItem<'static>] {
         static CELL: OnceLock<Vec<ListItem<'static>>> = OnceLock::new();
         CELL.get_or_init(|| {
-            Pixel::iter()
+            PixelInstance::iter()
                 .sorted_by_key(|pixel| pixel.hotkey())
                 .map(|pixel| ListItem::new(format!("[{}]{}", pixel.hotkey(), pixel.name())))
                 .collect::<Vec<_>>()
@@ -96,7 +96,7 @@ impl Renderer {
 
         let list_items = Self::list_items();
         let mut list_state = ListState::default().with_selected(
-            Pixel::iter()
+            PixelInstance::iter()
                 .sorted_by_key(|pixel| pixel.hotkey())
                 .position(|p| p == state.active_pixel),
         );
@@ -135,27 +135,27 @@ pub trait PixelDisplay {
     fn display(&self) -> Color;
 }
 
-impl PixelDisplay for Pixel {
+impl PixelDisplay for PixelInstance {
     fn display(&self) -> Color {
         match self {
             // light blue
-            Pixel::Steam(_) => Color::Indexed(69),
+            PixelInstance::Steam(_) => Color::Indexed(69),
             // darker yellow
-            Pixel::Sand(_) => Color::Indexed(214),
+            PixelInstance::Sand(_) => Color::Indexed(214),
             // grey
-            Pixel::Rock(_) => Color::Indexed(254),
-            Pixel::Water(_) => Color::Blue,
-            Pixel::Void(_) => Color::Black,
-            Pixel::Fire(_) => Color::Red,
-            Pixel::EternalFire(_) => Color::Indexed(52),
-            Pixel::Wood(val) => {
+            PixelInstance::Rock(_) => Color::Indexed(254),
+            PixelInstance::Water(_) => Color::Blue,
+            PixelInstance::Void(_) => Color::Black,
+            PixelInstance::Fire(_) => Color::Red,
+            PixelInstance::EternalFire(_) => Color::Indexed(52),
+            PixelInstance::Wood(val) => {
                 if val.is_burning() {
                     Color::Indexed(202)
                 } else {
                     Color::Yellow
                 }
             }
-            Pixel::Ice(_) => Color::Indexed(195),
+            PixelInstance::Ice(_) => Color::Indexed(195),
         }
     }
 }
@@ -173,7 +173,7 @@ impl Shape for TuiSandbox<'_> {
     fn draw(&self, painter: &mut Painter) {
         for (x, y_axel) in self.pixels.iter().enumerate() {
             for (y, pixel) in y_axel.iter().enumerate() {
-                if let Pixel::Void(_) = pixel.pixel() {
+                if let PixelInstance::Void(_) = pixel.pixel() {
                     continue;
                 }
                 painter.paint(x, y, pixel.pixel().display());

@@ -1,20 +1,19 @@
-use crate::pixel::{Direction, PixelContainer};
+use crate::pixel::{Direction, Pixel};
+use crate::utils::Coordinate;
 
 pub mod sandbox;
 mod virtualbox;
 
-pub type Coordinate = (usize, usize);
-
 pub trait SandboxControl {
-    fn matrix(&self) -> &[Vec<PixelContainer>];
-    fn matrix_mut(&mut self) -> &mut [Vec<PixelContainer>];
+    fn matrix(&self) -> &[Vec<Pixel>];
+    fn matrix_mut(&mut self) -> &mut [Vec<Pixel>];
     fn width(&self) -> usize;
     fn height(&self) -> usize;
-    fn get_pixel(&self, cord: Coordinate) -> Option<&PixelContainer> {
+    fn get_pixel(&self, cord: Coordinate) -> Option<&Pixel> {
         let (x, y) = cord;
         self.matrix().get(x).and_then(|p| p.get(y))
     }
-    fn get_pixel_mut(&mut self, cord: Coordinate) -> Option<&mut PixelContainer> {
+    fn get_pixel_mut(&mut self, cord: Coordinate) -> Option<&mut Pixel> {
         let (x, y) = cord;
         self.matrix_mut().get_mut(x).and_then(|p| p.get_mut(y))
     }
@@ -50,7 +49,7 @@ pub trait SandboxControl {
         &self,
         cord: Coordinate,
         dir: Direction,
-    ) -> Option<(Coordinate, &PixelContainer)> {
+    ) -> Option<(Coordinate, &Pixel)> {
         self.get_neighbour_coordinates(cord, dir)
             .and_then(|new_cord| self.get_pixel(new_cord).map(|p| (new_cord, p)))
     }

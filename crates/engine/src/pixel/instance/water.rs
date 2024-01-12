@@ -1,19 +1,15 @@
 use crate::pixel::ice::Ice;
 use crate::pixel::steam::Steam;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
+use crate::pixel::{PixelFundamental, PixelInstance, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Water {
     pub temp: u8,
-    state: PixelState,
 }
 
 impl Default for Water {
     fn default() -> Self {
-        Self {
-            temp: 20,
-            state: Default::default(),
-        }
+        Self { temp: 20 }
     }
 }
 
@@ -39,15 +35,7 @@ impl PixelFundamental for Water {
         5
     }
 
-    fn state(&self) -> &PixelState {
-        &self.state
-    }
-
-    fn state_mut(&mut self) -> &mut PixelState {
-        &mut self.state
-    }
-
-    fn update(&mut self) -> Option<Pixel> {
+    fn update(&mut self) -> Option<PixelInstance> {
         if self.is_burning() {
             Some(Steam::default().into())
         } else if self.is_frozen() {
@@ -59,19 +47,19 @@ impl PixelFundamental for Water {
 }
 
 impl PixelInteract for Water {
-    fn interact(&mut self, target: Pixel) {
+    fn interact(&mut self, target: PixelInstance) {
         match target {
-            Pixel::Fire(_) | Pixel::EternalFire(_) => {
+            PixelInstance::Fire(_) | PixelInstance::EternalFire(_) => {
                 if !self.is_burning() {
                     self.temp += 2;
                 }
             }
-            Pixel::Wood(val) => {
+            PixelInstance::Wood(val) => {
                 if val.is_burning() && !self.is_burning() {
                     self.temp += 2;
                 }
             }
-            Pixel::Ice(_) => {
+            PixelInstance::Ice(_) => {
                 if !self.is_frozen() {
                     self.temp -= 2;
                 }

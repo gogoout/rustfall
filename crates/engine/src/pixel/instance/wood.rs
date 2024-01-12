@@ -1,20 +1,15 @@
 use crate::pixel::void::Void;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
+use crate::pixel::{PixelFundamental, PixelInstance, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Wood {
     pub temp: u8,
     pub life: u8,
-    state: PixelState,
 }
 
 impl Default for Wood {
     fn default() -> Self {
-        Self {
-            temp: 0,
-            life: 225,
-            state: Default::default(),
-        }
+        Self { temp: 0, life: 225 }
     }
 }
 
@@ -37,15 +32,7 @@ impl PixelFundamental for Wood {
         }
     }
 
-    fn state(&self) -> &PixelState {
-        &self.state
-    }
-
-    fn state_mut(&mut self) -> &mut PixelState {
-        &mut self.state
-    }
-
-    fn update(&mut self) -> Option<Pixel> {
+    fn update(&mut self) -> Option<PixelInstance> {
         if self.is_burning() && self.life > 0 {
             self.life -= 1;
         }
@@ -58,24 +45,24 @@ impl PixelFundamental for Wood {
 }
 
 impl PixelInteract for Wood {
-    fn interact(&mut self, target: Pixel) {
+    fn interact(&mut self, target: PixelInstance) {
         match target {
-            Pixel::Water(_) => {
+            PixelInstance::Water(_) => {
                 if self.is_burning() {
                     self.temp -= 20;
                 }
             }
-            Pixel::Ice(_) => {
+            PixelInstance::Ice(_) => {
                 if self.is_burning() {
                     self.temp -= 30;
                 }
             }
-            Pixel::Fire(_) | Pixel::EternalFire(_) => {
+            PixelInstance::Fire(_) | PixelInstance::EternalFire(_) => {
                 if !self.is_burning() {
                     self.temp += 20;
                 }
             }
-            Pixel::Wood(val) => {
+            PixelInstance::Wood(val) => {
                 if val.is_burning() && !self.is_burning() {
                     self.temp += 20;
                 }

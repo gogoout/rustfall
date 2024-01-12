@@ -1,17 +1,13 @@
 use crate::pixel::void::Void;
-use crate::pixel::{Pixel, PixelFundamental, PixelInteract, PixelState, PixelType};
+use crate::pixel::{PixelFundamental, PixelInstance, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Fire {
     life: u8,
-    state: PixelState,
 }
 impl Default for Fire {
     fn default() -> Self {
-        Self {
-            life: 60,
-            state: Default::default(),
-        }
+        Self { life: 60 }
     }
 }
 
@@ -24,15 +20,7 @@ impl PixelFundamental for Fire {
         PixelType::Gas(-1)
     }
 
-    fn state(&self) -> &PixelState {
-        &self.state
-    }
-
-    fn state_mut(&mut self) -> &mut PixelState {
-        &mut self.state
-    }
-
-    fn update(&mut self) -> Option<Pixel> {
+    fn update(&mut self) -> Option<PixelInstance> {
         self.life -= 1;
 
         if self.life == 0 {

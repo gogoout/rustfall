@@ -1,25 +1,19 @@
-pub mod eternal_fire;
-pub mod fire;
-pub mod ice;
-pub mod rock;
-pub mod sand;
-pub mod steam;
-pub mod void;
-pub mod water;
-pub mod wood;
+pub mod instance;
 
-use crate::pixel::eternal_fire::EternalFire;
-use crate::pixel::fire::Fire;
-use crate::pixel::ice::Ice;
-use crate::pixel::rock::Rock;
-use crate::pixel::sand::Sand;
-use crate::pixel::steam::Steam;
-use crate::pixel::void::Void;
-use crate::pixel::water::Water;
-use crate::pixel::wood::Wood;
-use crate::sandbox::{Coordinate, SandboxControl};
+use crate::pixel::instance::eternal_fire::EternalFire;
+use crate::pixel::instance::fire::Fire;
+use crate::pixel::instance::ice::Ice;
+use crate::pixel::instance::rock::Rock;
+use crate::pixel::instance::sand::Sand;
+use crate::pixel::instance::steam::Steam;
+use crate::pixel::instance::void::Void;
+use crate::pixel::instance::water::Water;
+use crate::pixel::instance::wood::Wood;
+use crate::sandbox::SandboxControl;
+use crate::utils::Coordinate;
 use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
+use line_drawing::{Bresenham, Point};
 use rand::distributions::Distribution;
 use rand::distributions::Uniform;
 use rand::Rng;
@@ -133,15 +127,17 @@ impl Direction {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PixelState {
+pub struct Pixel {
     pub(crate) is_moved: bool,
     pub(crate) velocity: (i16, i16),
+    pub instance: PixelInstance,
 }
 
+const GRAVITY: i16 = 15;
 const MAX_VELOCITY: i16 = 5000;
 const MIX_VELOCITY: i16 = -5000;
 
-impl PixelState {
+impl Pixel {
     pub fn is_moved(&self) -> bool {
         self.is_moved
     }
@@ -149,7 +145,7 @@ impl PixelState {
         self.is_moved = flag;
     }
 
-    pub fn update_velocity(&mut self, velocity: (i16, i16)) {
+    fn update_velocity(&mut self, velocity: (i16, i16)) {
         let (x, y) = velocity;
 
         self.velocity = (
@@ -158,20 +154,19 @@ impl PixelState {
         );
     }
 
-    pub fn update_velocity_x(&mut self, vx: i16) {
+    fn update_velocity_x(&mut self, vx: i16) {
         self.velocity.0 = vx.min(MIX_VELOCITY).max(MAX_VELOCITY);
     }
 
-    pub fn update_velocity_y(&mut self, vy: i16) {
+    fn update_velocity_y(&mut self, vy: i16) {
         self.velocity.1 = vy.min(MIX_VELOCITY).max(MAX_VELOCITY);
     }
 
-    pub fn update_velocity_y_with_gravity(&mut self) {
-        const GRAVITY: i16 = 15;
+    fn update_velocity_with_gravity(&mut self) {
         self.update_velocity_y(self.velocity.1 + GRAVITY);
     }
 
-    pub fn update_velocity_x_with_friction(&mut self, friction: i16) {
+    fn update_velocity_with_friction(&mut self, friction: i16) {
         match self.velocity.0 {
             x if x > 0 => self.velocity.0 = (self.velocity.0 - friction).min(0),
             x if x < 0 => self.velocity.0 = (self.velocity.0 + friction).max(0),
@@ -179,44 +174,79 @@ impl PixelState {
         }
     }
 
-    pub fn calculate_target_coordinate(&self, cord: Coordinate) -> Coordinate {
+    fn reverse_velocity_x(&mut self) {
+        self.velocity.0 = -self.velocity.0;
+    }
+
+    fn velocity_y_to_x(&mut self) {
+        self.velocity.0 = self.velocity.1;
+        self.velocity.1 = 0;
+    }
+
+    fn calculate_target_coordinate(&self, cord: Coordinate) -> Coordinate {
         let (x, y) = cord;
         let (vx, vy) = self.velocity;
         let (vx, vy) = (vx / 1000, vy / 1000);
-        let x = (vx as i32 + x as i32).min(0) as usize;
-        let y = (vy as i32 + y as i32).min(0) as usize;
+        let x = (vx as isize + x as isize).min(0) as usize;
+        let y = (vy as isize + y as isize).min(0) as usize;
         (x, y)
     }
-}
 
-#[enum_dispatch]
-pub trait PixelFundamental {
-    fn name(&self) -> &'static str;
+    fn calculate_collied_coordinate<Ctrl: SandboxControl>(
+        &self,
+        cord: Coordinate,
+        target_cord: Coordinate,
+        ctrl: &Ctrl,
+    ) -> Coordinate {
+        let mut bresenham = Bresenham::new(
+            Self::coordinate_to_point(cord),
+            Self::coordinate_to_point(target_cord),
+        );
 
-    fn pixel_type(&self) -> PixelType;
+        let mut last_cord = cord;
+        bresenham.any(|point| {
+            let current = Self::point_to_coordinate(point);
 
-    fn friction(&self) -> i16 {
-        0
+            let is_collied = {
+                let current_pixel = ctrl.get_pixel(current);
+
+                match current_pixel {
+                    Some(pixel) => pixel.instance.pixel_type() != PixelType::Void,
+                    None => false,
+                }
+            };
+
+            return match is_collied {
+                true => true,
+                false => {
+                    last_cord = current;
+                    false
+                }
+            };
+        });
+
+        last_cord
     }
 
-    fn state(&self) -> &PixelState;
-    fn state_mut(&mut self) -> &mut PixelState;
-
-    fn update(&mut self) -> Option<Pixel> {
-        None
+    fn coordinate_to_point(cord: Coordinate) -> Point<isize> {
+        (cord.0 as isize, cord.1 as isize)
     }
 
-    fn tick_move<Ctrl: SandboxControl, R: Rng>(
+    fn point_to_coordinate(point: Point<isize>) -> Coordinate {
+        (point.0 as usize, point.1 as usize)
+    }
+
+    pub fn tick_move<Ctrl: SandboxControl, R: Rng>(
         &self,
         cord: Coordinate,
         ctrl: &Ctrl,
         rng: &mut R,
     ) -> Option<Coordinate> {
-        let check_density = |density, dir: Direction, reverse: bool| {
+        let check_density = |density: i8, dir: Direction, reverse: bool| {
             ctrl.get_neighbour_pixel(cord, dir)
                 .and_then(|(new_cord, p)| match p.is_moved() {
                     true => None,
-                    false => Some((new_cord, p.pixel().pixel_type())),
+                    false => Some((new_cord, p.instance.pixel_type())),
                 })
                 .and_then(|(new_cord, p)| match p {
                     PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
@@ -232,30 +262,60 @@ pub trait PixelFundamental {
                 })
         };
 
-        match self.pixel_type() {
-            PixelType::Solid(density) => Direction::solid_directions(rng)
-                .iter()
-                .find_map(|dir| check_density(density, *dir, false)),
-            PixelType::Liquid(density) => Direction::liquid_directions(rng)
-                .iter()
-                .find_map(|dir| check_density(density, *dir, false)),
-            PixelType::Gas(density) => Direction::gas_directions(rng)
-                .iter()
-                .find_map(|dir| check_density(density, *dir, true)),
-            PixelType::Wall | PixelType::Void => None,
+        let target_cord = self.calculate_target_coordinate(cord);
+        let final_cord = self.calculate_collied_coordinate(cord, target_cord, ctrl);
+        let is_collied = final_cord != target_cord;
+
+        let hit_bottom = target_cord.1 == 0 && self.velocity.1 > 0;
+        let hit_left = target_cord.0 == 0 && self.velocity.0 < 0;
+        let hit_right = target_cord.0 == ctrl.width() - 1 && self.velocity.0 > 0;
+
+        if (is_collied || hit_bottom || hit_left || hit_right) {
+        } else {
         }
+
+        todo!()
+
+        //
+        // match self.pixel_type() {
+        //     PixelType::Solid(density) => Direction::solid_directions(rng)
+        //         .iter()
+        //         .find_map(|dir| check_density(density, *dir, false)),
+        //     PixelType::Liquid(density) => Direction::liquid_directions(rng)
+        //         .iter()
+        //         .find_map(|dir| check_density(density, *dir, false)),
+        //     PixelType::Gas(density) => Direction::gas_directions(rng)
+        //         .iter()
+        //         .find_map(|dir| check_density(density, *dir, true)),
+        //     PixelType::Wall | PixelType::Void => None,
+        // }
+    }
+}
+
+#[enum_dispatch]
+pub trait PixelFundamental {
+    fn name(&self) -> &'static str;
+
+    fn pixel_type(&self) -> PixelType;
+
+    fn friction(&self) -> i16 {
+        0
+    }
+
+    fn update(&mut self) -> Option<PixelInstance> {
+        None
     }
 }
 
 #[enum_dispatch]
 pub trait PixelInteract {
-    fn interact(&mut self, _target: Pixel) {}
+    fn interact(&mut self, _target: PixelInstance) {}
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, strum_macros::EnumIter)]
 #[repr(u8)]
 #[enum_dispatch(PixelInteract, PixelFundamental)]
-pub enum Pixel {
+pub enum PixelInstance {
     Steam(Steam),
     Sand(Sand),
     Rock(Rock),
@@ -267,13 +327,13 @@ pub enum Pixel {
     Void(Void),
 }
 
-impl Default for Pixel {
+impl Default for PixelInstance {
     fn default() -> Self {
         Void::default().into()
     }
 }
 
-impl Display for Pixel {
+impl Display for PixelInstance {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name())
     }

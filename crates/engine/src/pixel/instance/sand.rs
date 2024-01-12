@@ -1,9 +1,7 @@
-use crate::pixel::{PixelFundamental, PixelInteract, PixelState, PixelType};
+use crate::pixel::{PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
-pub struct Sand {
-    state: PixelState,
-}
+pub struct Sand;
 
 impl PixelFundamental for Sand {
     fn name(&self) -> &'static str {
@@ -16,14 +14,6 @@ impl PixelFundamental for Sand {
 
     fn friction(&self) -> i16 {
         15
-    }
-
-    fn state(&self) -> &PixelState {
-        &self.state
-    }
-
-    fn state_mut(&mut self) -> &mut PixelState {
-        &mut self.state
     }
 }
 

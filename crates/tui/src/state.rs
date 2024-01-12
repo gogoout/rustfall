@@ -3,7 +3,7 @@ use strum::IntoEnumIterator;
 
 use crate::event::Event;
 use crate::render::Renderer;
-use engine::pixel::Pixel;
+use engine::pixel::PixelInstance;
 use engine::sandbox::sandbox::Sandbox;
 
 /// Application.
@@ -12,7 +12,7 @@ pub struct State {
     /// should the application exit?
     pub should_quit: bool,
     pub sandbox: Sandbox,
-    pub active_pixel: Pixel,
+    pub active_pixel: PixelInstance,
     no_braille: bool,
     mouse_down_event: Option<MouseEvent>,
     pub pause: bool,
@@ -74,7 +74,7 @@ impl State {
             KeyCode::Char('c') if e.modifiers == KeyModifiers::CONTROL => self.quit(),
             KeyCode::Char(' ') => self.pause = !self.pause,
             KeyCode::Char(c) => {
-                if let Some(pixel) = Pixel::iter().find(|pixel| pixel.hotkey() == c) {
+                if let Some(pixel) = PixelInstance::iter().find(|pixel| pixel.hotkey() == c) {
                     self.active_pixel = pixel;
                 }
             }
@@ -130,7 +130,7 @@ impl State {
         }
 
         match self.active_pixel {
-            Pixel::Void(_) => self.sandbox.place_pixel_force(self.active_pixel, (x, y)),
+            PixelInstance::Void(_) => self.sandbox.place_pixel_force(self.active_pixel, (x, y)),
             _ => self.sandbox.place_pixel(self.active_pixel, (x, y)),
         }
     }
@@ -140,18 +140,18 @@ pub trait PixelHotkey {
     fn hotkey(&self) -> char;
 }
 
-impl PixelHotkey for Pixel {
+impl PixelHotkey for PixelInstance {
     fn hotkey(&self) -> char {
         match self {
-            Pixel::Sand(_) => '1',
-            Pixel::Rock(_) => '2',
-            Pixel::Water(_) => '3',
-            Pixel::Steam(_) => '4',
-            Pixel::Ice(_) => '5',
-            Pixel::Fire(_) => '6',
-            Pixel::EternalFire(_) => '7',
-            Pixel::Wood(_) => '8',
-            Pixel::Void(_) => '0',
+            PixelInstance::Sand(_) => '1',
+            PixelInstance::Rock(_) => '2',
+            PixelInstance::Water(_) => '3',
+            PixelInstance::Steam(_) => '4',
+            PixelInstance::Ice(_) => '5',
+            PixelInstance::Fire(_) => '6',
+            PixelInstance::EternalFire(_) => '7',
+            PixelInstance::Wood(_) => '8',
+            PixelInstance::Void(_) => '0',
         }
     }
 }

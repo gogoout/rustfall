@@ -1,9 +1,7 @@
-use crate::pixel::{PixelFundamental, PixelInteract, PixelState, PixelType};
+use crate::pixel::{PixelFundamental, PixelInteract, PixelType};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
-pub struct EternalFire {
-    state: PixelState,
-}
+pub struct EternalFire;
 
 impl PixelFundamental for EternalFire {
     fn name(&self) -> &'static str {
@@ -12,14 +10,6 @@ impl PixelFundamental for EternalFire {
 
     fn pixel_type(&self) -> PixelType {
         PixelType::Wall
-    }
-
-    fn state(&self) -> &PixelState {
-        &self.state
-    }
-
-    fn state_mut(&mut self) -> &mut PixelState {
-        &mut self.state
     }
 }
 

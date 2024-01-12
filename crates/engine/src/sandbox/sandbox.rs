@@ -1,4 +1,4 @@
-use crate::pixel::{Direction, Pixel, PixelContainer, PixelFundamental, PixelInteract, PixelType};
+use crate::pixel::{Direction, Pixel, PixelFundamental, PixelInstance, PixelInteract, PixelType};
 use crate::sandbox::virtualbox::VirtualBox;
 use crate::sandbox::{Coordinate, SandboxControl};
 use rand::{thread_rng, Rng};
@@ -11,16 +11,16 @@ const VIRTUAL_COLUMNIZED_WIDTH: usize = 5;
 pub struct Sandbox {
     pub width: usize,
     pub height: usize,
-    pub pixels: Vec<Vec<PixelContainer>>,
+    pub pixels: Vec<Vec<Pixel>>,
     ltr: bool,
 }
 
 impl SandboxControl for Sandbox {
-    fn matrix(&self) -> &[Vec<PixelContainer>] {
+    fn matrix(&self) -> &[Vec<Pixel>] {
         &self.pixels
     }
 
-    fn matrix_mut(&mut self) -> &mut [Vec<PixelContainer>] {
+    fn matrix_mut(&mut self) -> &mut [Vec<Pixel>] {
         &mut self.pixels
     }
 
@@ -38,23 +38,23 @@ impl Sandbox {
         Self {
             width,
             height,
-            pixels: vec![vec![PixelContainer::default(); height]; width],
+            pixels: vec![vec![Pixel::default(); height]; width],
             ltr: true,
         }
     }
 
-    pub fn place_pixel<P: Into<Pixel>>(&mut self, pixel: P, cord: Coordinate) {
+    pub fn place_pixel<P: Into<PixelInstance>>(&mut self, pixel: P, cord: Coordinate) {
         if let Some(p) = self.get_pixel_mut(cord) {
             if p.pixel().pixel_type() != PixelType::Void {
                 return;
             }
-            *p = PixelContainer::new(pixel.into());
+            *p = Pixel::new(pixel.into());
         }
     }
 
-    pub fn place_pixel_force<P: Into<Pixel>>(&mut self, pixel: P, cord: Coordinate) {
+    pub fn place_pixel_force<P: Into<PixelInstance>>(&mut self, pixel: P, cord: Coordinate) {
         if let Some(p) = self.get_pixel_mut(cord) {
-            *p = PixelContainer::new(pixel.into());
+            *p = Pixel::new(pixel.into());
         }
     }
 
@@ -144,7 +144,7 @@ impl Sandbox {
                 });
 
                 if let Some(new_pixel) = PixelFundamental::update(pixel.pixel_mut()) {
-                    *pixel = PixelContainer::new(new_pixel);
+                    *pixel = Pixel::new(new_pixel);
                 }
             });
         });
