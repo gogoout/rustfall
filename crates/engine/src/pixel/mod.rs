@@ -12,7 +12,6 @@ use crate::pixel::instance::wood::Wood;
 use crate::sandbox::SandboxControl;
 use crate::utils::Coordinate;
 use enum_dispatch::enum_dispatch;
-use itertools::Itertools;
 use line_drawing::{Bresenham, Point};
 use rand::distributions::Distribution;
 use rand::distributions::Uniform;
@@ -36,6 +35,17 @@ pub enum PixelType {
     Void,
 }
 
+impl PixelType {
+    pub fn density(&self) -> Option<i8> {
+        match self {
+            PixelType::Gas(d) => Some(*d),
+            PixelType::Liquid(d) => Some(*d),
+            PixelType::Solid(d) => Some(*d),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum Direction {
@@ -50,62 +60,21 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn gas_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
-        static DIRECTIONS: OnceLock<Vec<[Direction; 5]>> = OnceLock::new();
-        let v = DIRECTIONS.get_or_init(|| {
-            let v = vec![
-                [Direction::Up, Direction::UpLeft, Direction::UpRight],
-                [Direction::Up, Direction::UpRight, Direction::UpLeft],
-                [Direction::UpLeft, Direction::UpRight, Direction::Up],
-                [Direction::UpLeft, Direction::Up, Direction::UpRight],
-                [Direction::UpRight, Direction::UpLeft, Direction::Up],
-                [Direction::UpRight, Direction::Up, Direction::UpLeft],
-            ];
-
-            v.into_iter()
-                .flat_map(|arr| {
-                    [
-                        [arr[0], arr[1], arr[2], Direction::Left, Direction::Right],
-                        [arr[0], arr[1], arr[2], Direction::Right, Direction::Left],
-                    ]
-                })
-                .collect::<Vec<_>>()
-        });
-
-        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
-        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
-
-        let idx = between.sample(rng);
-        v[idx].as_ref()
+    pub fn to_velocity(&self) -> (i16, i16) {
+        match self {
+            Direction::Up => (0, -1),
+            Direction::Down => (0, 1),
+            Direction::Left => (-1, 0),
+            Direction::Right => (1, 0),
+            Direction::UpLeft => (-1, -1),
+            Direction::UpRight => (1, -1),
+            Direction::DownLeft => (-1, 1),
+            Direction::DownRight => (1, 1),
+        }
     }
-    pub fn liquid_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
-        static DIRECTIONS: OnceLock<Vec<[Direction; 5]>> = OnceLock::new();
-        let v = DIRECTIONS.get_or_init(|| {
-            let v1 = vec![
-                [Direction::DownLeft, Direction::DownRight],
-                [Direction::DownRight, Direction::DownLeft],
-            ];
-            let v2 = vec![
-                [Direction::Left, Direction::Right],
-                [Direction::Right, Direction::Left],
-            ];
 
-            v1.into_iter()
-                .flat_map(|v1| {
-                    v2.iter()
-                        .map(|v2| [Direction::Down, v1[0], v1[1], v2[0], v2[1]])
-                        .collect_vec()
-                })
-                .collect::<Vec<_>>()
-        });
-
-        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
-        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
-
-        let idx = between.sample(rng);
-        v[idx].as_ref()
-    }
-    pub fn solid_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
+    // Return a list of directions where Down is always the first element, then DownLeft and DownRight randomly
+    pub fn down_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
         static DIRECTIONS: OnceLock<Vec<[Direction; 3]>> = OnceLock::new();
         let v = DIRECTIONS.get_or_init(|| {
             let v = vec![
@@ -116,6 +85,44 @@ impl Direction {
             v.into_iter()
                 .map(|v| [Direction::Down, v[0], v[1]])
                 .collect::<Vec<_>>()
+        });
+
+        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
+        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
+
+        let idx = between.sample(rng);
+        v[idx].as_ref()
+    }
+
+    /// Return Left or Right randomly
+    pub fn horizontal_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
+        static DIRECTIONS: OnceLock<Vec<[Direction; 2]>> = OnceLock::new();
+        let v = DIRECTIONS.get_or_init(|| {
+            vec![
+                [Direction::Left, Direction::Right],
+                [Direction::Right, Direction::Left],
+            ]
+        });
+
+        static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
+        let between = BETWEEN.get_or_init(|| Uniform::new(0, v.len()));
+
+        let idx = between.sample(rng);
+        v[idx].as_ref()
+    }
+
+    /// Return Up, UpLeft, or UpRight randomly
+    pub fn up_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
+        static DIRECTIONS: OnceLock<Vec<[Direction; 3]>> = OnceLock::new();
+        let v = DIRECTIONS.get_or_init(|| {
+            vec![
+                [Direction::Up, Direction::UpLeft, Direction::UpRight],
+                [Direction::Up, Direction::UpRight, Direction::UpLeft],
+                [Direction::UpLeft, Direction::UpRight, Direction::Up],
+                [Direction::UpLeft, Direction::Up, Direction::UpRight],
+                [Direction::UpRight, Direction::UpLeft, Direction::Up],
+                [Direction::UpRight, Direction::Up, Direction::UpLeft],
+            ]
         });
 
         static BETWEEN: OnceLock<Uniform<usize>> = OnceLock::new();
@@ -143,6 +150,79 @@ impl Pixel {
     }
     pub fn mark_is_moved(&mut self, flag: bool) {
         self.is_moved = flag;
+    }
+
+    fn check_density<Ctrl: SandboxControl>(
+        &self,
+        cord: Coordinate,
+        dir: Direction,
+        ctrl: Ctrl,
+    ) -> bool {
+        let density: Option<i8> = self.instance.pixel_type().density();
+        let Some(density) = density else{
+            return false;
+        };
+        let reverse = density < 0;
+
+        ctrl.get_neighbour_pixel(cord, dir)
+            .and_then(|(new_cord, p)| match p.is_moved() {
+                true => None,
+                false => Some(p.instance.pixel_type()),
+            })
+            .map_or(false, |p| match p {
+                PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
+                    match (density == td, density > td, reverse) {
+                        (true, _, _) => false,
+                        (false, true, false) => true,
+                        (false, false, true) => true,
+                        _ => false,
+                    }
+                }
+                PixelType::Wall => false,
+                PixelType::Void => true,
+            })
+    }
+
+    fn can_move_up<R: Rng, Ctrl: SandboxControl>(
+        &self,
+        cord: Coordinate,
+        rng: &mut R,
+        ctrl: Ctrl,
+    ) -> Option<Direction> {
+        match self.instance.pixel_type() {
+            PixelType::Gas(_) => Direction::up_directions(rng)
+                .iter()
+                .find_map(|dir| self.check_density(cord, *dir, ctrl).then(|| *dir)),
+            _ => None,
+        }
+    }
+
+    fn can_move_down<R: Rng, Ctrl: SandboxControl>(
+        &self,
+        cord: Coordinate,
+        rng: &mut R,
+        ctrl: Ctrl,
+    ) -> Option<Direction> {
+        match self.instance.pixel_type() {
+            PixelType::Solid(_) | PixelType::Liquid(_) => Direction::down_directions(rng)
+                .iter()
+                .find_map(|dir| self.check_density(cord, *dir, ctrl).then(|| *dir)),
+            _ => None,
+        }
+    }
+
+    fn can_move_horizontal<R: Rng, Ctrl: SandboxControl>(
+        &self,
+        cord: Coordinate,
+        rng: &mut R,
+        ctrl: Ctrl,
+    ) -> Option<Direction> {
+        match self.instance.pixel_type() {
+            PixelType::Liquid(_) | PixelType::Gas(_) => Direction::horizontal_directions(rng)
+                .iter()
+                .find_map(|dir| self.check_density(cord, *dir, ctrl).then(|| *dir)),
+            _ => None,
+        }
     }
 
     fn update_velocity(&mut self, velocity: (i16, i16)) {
@@ -242,26 +322,6 @@ impl Pixel {
         ctrl: &Ctrl,
         rng: &mut R,
     ) -> Option<Coordinate> {
-        let check_density = |density: i8, dir: Direction, reverse: bool| {
-            ctrl.get_neighbour_pixel(cord, dir)
-                .and_then(|(new_cord, p)| match p.is_moved() {
-                    true => None,
-                    false => Some((new_cord, p.instance.pixel_type())),
-                })
-                .and_then(|(new_cord, p)| match p {
-                    PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
-                        match (density == td, density > td, reverse) {
-                            (true, _, _) => None,
-                            (false, true, false) => Some(new_cord),
-                            (false, false, true) => Some(new_cord),
-                            _ => None,
-                        }
-                    }
-                    PixelType::Wall => None,
-                    PixelType::Void => Some(new_cord),
-                })
-        };
-
         let target_cord = self.calculate_target_coordinate(cord);
         let final_cord = self.calculate_collied_coordinate(cord, target_cord, ctrl);
         let is_collied = final_cord != target_cord;
