@@ -19,6 +19,10 @@ use rand::Rng;
 use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;
 
+const GRAVITY: i16 = 15;
+const MAX_VELOCITY: i16 = 5000;
+const MIX_VELOCITY: i16 = -5000;
+
 /// Holds the type and density of a pixel
 #[derive(Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -63,13 +67,13 @@ impl Direction {
     pub fn to_velocity(&self) -> (i16, i16) {
         match self {
             Direction::Up => (0, -1),
-            Direction::Down => (0, 1),
             Direction::Left => (-1, 0),
             Direction::Right => (1, 0),
             Direction::UpLeft => (-1, -1),
             Direction::UpRight => (1, -1),
-            Direction::DownLeft => (-1, 1),
-            Direction::DownRight => (1, 1),
+            Direction::Down => (0, GRAVITY),
+            Direction::DownLeft => (-1, GRAVITY),
+            Direction::DownRight => (1, GRAVITY),
         }
     }
 
@@ -140,10 +144,6 @@ pub struct Pixel {
     pub instance: PixelInstance,
 }
 
-const GRAVITY: i16 = 15;
-const MAX_VELOCITY: i16 = 5000;
-const MIX_VELOCITY: i16 = -5000;
-
 impl Pixel {
     pub fn is_moved(&self) -> bool {
         self.is_moved
@@ -152,12 +152,7 @@ impl Pixel {
         self.is_moved = flag;
     }
 
-    fn check_density<Ctrl: SandboxControl>(
-        &self,
-        cord: Coordinate,
-        dir: Direction,
-        ctrl: Ctrl,
-    ) -> bool {
+    fn can_move<Ctrl: SandboxControl>(&self, cord: Coordinate, dir: Direction, ctrl: Ctrl) -> bool {
         let density: Option<i8> = self.instance.pixel_type().density();
         let Some(density) = density else{
             return false;
@@ -192,7 +187,7 @@ impl Pixel {
         match self.instance.pixel_type() {
             PixelType::Gas(_) => Direction::up_directions(rng)
                 .iter()
-                .find_map(|dir| self.check_density(cord, *dir, ctrl).then(|| *dir)),
+                .find_map(|dir| self.can_move(cord, *dir, ctrl).then(|| *dir)),
             _ => None,
         }
     }
@@ -206,7 +201,7 @@ impl Pixel {
         match self.instance.pixel_type() {
             PixelType::Solid(_) | PixelType::Liquid(_) => Direction::down_directions(rng)
                 .iter()
-                .find_map(|dir| self.check_density(cord, *dir, ctrl).then(|| *dir)),
+                .find_map(|dir| self.can_move(cord, *dir, ctrl).then(|| *dir)),
             _ => None,
         }
     }
@@ -220,7 +215,7 @@ impl Pixel {
         match self.instance.pixel_type() {
             PixelType::Liquid(_) | PixelType::Gas(_) => Direction::horizontal_directions(rng)
                 .iter()
-                .find_map(|dir| self.check_density(cord, *dir, ctrl).then(|| *dir)),
+                .find_map(|dir| self.can_move(cord, *dir, ctrl).then(|| *dir)),
             _ => None,
         }
     }
@@ -272,18 +267,21 @@ impl Pixel {
         (x, y)
     }
 
+    /// returns (the final coordinate can be place, the coordinate where it collides)
     fn calculate_collied_coordinate<Ctrl: SandboxControl>(
         &self,
         cord: Coordinate,
         target_cord: Coordinate,
         ctrl: &Ctrl,
-    ) -> Coordinate {
+    ) -> (Coordinate, Option<Coordinate>) {
         let mut bresenham = Bresenham::new(
             Self::coordinate_to_point(cord),
             Self::coordinate_to_point(target_cord),
         );
 
         let mut last_cord = cord;
+        let mut collied_cord = None;
+
         bresenham.any(|point| {
             let current = Self::point_to_coordinate(point);
 
@@ -297,7 +295,10 @@ impl Pixel {
             };
 
             return match is_collied {
-                true => true,
+                true => {
+                    collied_cord = Some(current);
+                    true
+                }
                 false => {
                     last_cord = current;
                     false
@@ -305,7 +306,7 @@ impl Pixel {
             };
         });
 
-        last_cord
+        (last_cord, collied_cord)
     }
 
     fn coordinate_to_point(cord: Coordinate) -> Point<isize> {
@@ -317,23 +318,46 @@ impl Pixel {
     }
 
     pub fn tick_move<Ctrl: SandboxControl, R: Rng>(
+        &mut self,
+        cord: Coordinate,
+        ctrl: &Ctrl,
+        rng: &mut R,
+    ) {
+    }
+
+    pub fn tick_velocity_move<Ctrl: SandboxControl, R: Rng>(
         &self,
         cord: Coordinate,
         ctrl: &Ctrl,
         rng: &mut R,
     ) -> Option<Coordinate> {
+        // calculating target coordinate based on velocity
         let target_cord = self.calculate_target_coordinate(cord);
-        let final_cord = self.calculate_collied_coordinate(cord, target_cord, ctrl);
-        let is_collied = final_cord != target_cord;
+        let (final_cord, collied_cord) = self.calculate_collied_coordinate(cord, target_cord, ctrl);
 
+        // check if there's any collision
+        let collied_pixel = collied_cord.and_then(|cord| ctrl.get_pixel(cord));
+        let has_collied = collied_cord.is_some();
         let hit_bottom = target_cord.1 == 0 && self.velocity.1 > 0;
         let hit_left = target_cord.0 == 0 && self.velocity.0 < 0;
         let hit_right = target_cord.0 == ctrl.width() - 1 && self.velocity.0 > 0;
 
-        if (is_collied || hit_bottom || hit_left || hit_right) {
-        } else {
-        }
+        // TODO
+        // move based on velocity
+        // check collision and update velocity
+        // check movement rule and update velocity
+        // is above step going to conflict with each other?
 
+        // update velocity
+        // when collied with a horizontal higher density pixel
+        // check it's speed, if it's faster do nothing, if it's slower, update current pixel's velocity to match it
+        // if it's the opposite direction, reverse current pixel's velocity
+        // when collided with a vertical higher density pixel
+        // transfer current pixel's velocity to horizontal velocity
+        // when the colling pixel has both horizontal and vertical delta, pick the one with the highest delta and apply above rules
+
+        // when collied with a lower density pixel
+        // remove current pixel's velocity (depending on the delta), and apply opposite velocity to the collided pixel
         todo!()
 
         //
