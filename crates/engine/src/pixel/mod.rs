@@ -71,9 +71,9 @@ impl Direction {
             Direction::Right => (1, 0),
             Direction::UpLeft => (-1, -1),
             Direction::UpRight => (1, -1),
-            Direction::Down => (0, GRAVITY),
-            Direction::DownLeft => (-1, GRAVITY),
-            Direction::DownRight => (1, GRAVITY),
+            Direction::Down => (0, 1),
+            Direction::DownLeft => (-1, 1),
+            Direction::DownRight => (1, 1),
         }
     }
 
@@ -152,7 +152,12 @@ impl Pixel {
         self.is_moved = flag;
     }
 
-    fn can_move<Ctrl: SandboxControl>(&self, cord: Coordinate, dir: Direction, ctrl: Ctrl) -> bool {
+    fn can_move_to_dir<Ctrl: SandboxControl>(
+        &self,
+        cord: Coordinate,
+        dir: Direction,
+        ctrl: &Ctrl,
+    ) -> bool {
         let density: Option<i8> = self.instance.pixel_type().density();
         let Some(density) = density else{
             return false;
@@ -182,12 +187,12 @@ impl Pixel {
         &self,
         cord: Coordinate,
         rng: &mut R,
-        ctrl: Ctrl,
+        ctrl: &Ctrl,
     ) -> Option<Direction> {
         match self.instance.pixel_type() {
             PixelType::Gas(_) => Direction::up_directions(rng)
                 .iter()
-                .find_map(|dir| self.can_move(cord, *dir, ctrl).then(|| *dir)),
+                .find_map(|dir| self.can_move_to_dir(cord, *dir, ctrl).then(|| *dir)),
             _ => None,
         }
     }
@@ -196,12 +201,21 @@ impl Pixel {
         &self,
         cord: Coordinate,
         rng: &mut R,
-        ctrl: Ctrl,
+        ctrl: &Ctrl,
     ) -> Option<Direction> {
         match self.instance.pixel_type() {
-            PixelType::Solid(_) | PixelType::Liquid(_) => Direction::down_directions(rng)
-                .iter()
-                .find_map(|dir| self.can_move(cord, *dir, ctrl).then(|| *dir)),
+            PixelType::Solid(_) | PixelType::Liquid(_) => {
+                // respect horizontal velocity
+                let dirs = match self.velocity.0 {
+                    x if x > 0 => &[Direction::Down, Direction::DownRight, Direction::DownLeft],
+                    x if x < 0 => &[Direction::Down, Direction::DownLeft, Direction::DownRight],
+                    0 => Direction::down_directions(rng),
+                    _ => unreachable!("velocity.0 should either above 0 or below 0 or equal to 0"),
+                };
+
+                dirs.iter()
+                    .find_map(|dir| self.can_move_to_dir(cord, *dir, ctrl).then(|| *dir))
+            }
             _ => None,
         }
     }
@@ -210,12 +224,20 @@ impl Pixel {
         &self,
         cord: Coordinate,
         rng: &mut R,
-        ctrl: Ctrl,
+        ctrl: &Ctrl,
     ) -> Option<Direction> {
         match self.instance.pixel_type() {
-            PixelType::Liquid(_) | PixelType::Gas(_) => Direction::horizontal_directions(rng)
-                .iter()
-                .find_map(|dir| self.can_move(cord, *dir, ctrl).then(|| *dir)),
+            PixelType::Liquid(_) | PixelType::Gas(_) => {
+                let dirs = match self.velocity.0 {
+                    x if x > 0 => &[Direction::Right, Direction::Left],
+                    x if x < 0 => &[Direction::Left, Direction::Right],
+                    0 => Direction::horizontal_directions(rng),
+                    _ => unreachable!("velocity.0 should either above 0 or below 0 or equal to 0"),
+                };
+
+                dirs.iter()
+                    .find_map(|dir| self.can_move_to_dir(cord, *dir, ctrl).then(|| *dir))
+            }
             _ => None,
         }
     }
@@ -253,7 +275,53 @@ impl Pixel {
         self.velocity.0 = -self.velocity.0;
     }
 
-    fn velocity_y_to_x(&mut self) {
+    fn velocity_y_to_x<R: Rng, Ctrl: SandboxControl>(
+        &mut self,
+        cord: Coordinate,
+        rng: &mut R,
+        ctrl: &Ctrl,
+    ) {
+        match self.can_move_horizontal(cord, rng, ctrl) {
+            Some(Direction::Left) => {
+                self.update_velocity_x(self.velocity.0 + self.velocity.1 * -1);
+                self.update_velocity_y(0);
+            }
+            Some(Direction::Right) => {
+                self.update_velocity_x(self.velocity.0 + self.velocity.1);
+                self.update_velocity_y(0);
+            }
+            // update self velocity to either left or right's pixels
+            None => {
+                let neighbour = Direction::horizontal_directions(rng)
+                    .iter()
+                    .find_map(|dir| ctrl.get_neighbour_pixel(cord, *dir).map(|(_, p)| p));
+
+                if let Some(neighbour) = neighbour {
+                    match neighbour.velocity.0 {
+                        x if x > 0 => {
+                            self.update_velocity_x(
+                                neighbour.velocity.0.min(self.velocity.0 + self.velocity.1),
+                            );
+                        }
+                        x if x < 0 => self.update_velocity_x(
+                            neighbour
+                                .velocity
+                                .0
+                                .max(self.velocity.0 + self.velocity.1 * -1),
+                        ),
+                        0 => self.update_velocity_x(0),
+                        _ => unreachable!(
+                            "neighbour.velocity.0 should either above 0 or below 0 or equal to 0"
+                        ),
+                    }
+                    self.update_velocity_y(0);
+                }
+            }
+            Some(_) => unreachable!(
+                "self.can_move_horizontal shouldn't return other than Left, Right, or None"
+            ),
+        }
+
         self.velocity.0 = self.velocity.1;
         self.velocity.1 = 0;
     }
@@ -325,7 +393,40 @@ impl Pixel {
     ) {
     }
 
-    pub fn tick_velocity_move<Ctrl: SandboxControl, R: Rng>(
+    fn tick_velocity_update<Ctrl: SandboxControl, R: Rng>(
+        &mut self,
+        cord: Coordinate,
+        ctrl: &Ctrl,
+        rng: &mut R,
+    ) {
+        // update velocity based on moveable directions
+        //  => down, downLeft, downRight -> update gravity
+        //  => otherwise transfer down velocity to horizontal velocity
+        match self.instance.pixel_type() {
+            PixelType::Solid(_) | PixelType::Liquid(_) => {
+                let dir = self.can_move_down(cord, rng, ctrl);
+                match dir {
+                    Some(Direction::Down) => self.update_velocity_with_gravity(),
+                    Some(Direction::DownLeft) => {
+                        self.update_velocity_x(self.velocity.0 - GRAVITY/2);
+                        self.update_velocity_y(self.velocity.1 + GRAVITY/2);
+                    },
+                    Some(Direction::DownRight) => {
+                        self.update_velocity_x(self.velocity.0 + GRAVITY/2);
+                        self.update_velocity_y(self.velocity.1 + GRAVITY/2);
+                    },
+                    None => self.velocity_y_to_x(cord, rng, ctrl),
+                    Some(_) => unreachable!("self.can_move_down shouldn't return other than Down, DownLeft, DownRight, or None"),
+                }
+            }
+        }
+
+        // when collied with a lower density pixel
+        // remove current pixel's velocity (depending on the delta), and apply opposite velocity to the collided pixel
+        todo!()
+    }
+
+    fn tick_velocity_move<Ctrl: SandboxControl, R: Rng>(
         &self,
         cord: Coordinate,
         ctrl: &Ctrl,
@@ -343,12 +444,15 @@ impl Pixel {
         let hit_right = target_cord.0 == ctrl.width() - 1 && self.velocity.0 > 0;
 
         // TODO
+        // check movement rule and update velocity <- has to be first step otherwise it's not atomic, and may blocked by another pixel in the next run
         // move based on velocity
         // check collision and update velocity
-        // check movement rule and update velocity
         // is above step going to conflict with each other?
 
         // update velocity
+        // place the pixel at the point before colide
+        // then apply the normal rule to determine the velocity updates
+
         // when collied with a horizontal higher density pixel
         // check it's speed, if it's faster do nothing, if it's slower, update current pixel's velocity to match it
         // if it's the opposite direction, reverse current pixel's velocity
