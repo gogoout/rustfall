@@ -64,19 +64,6 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn to_velocity(&self) -> (i16, i16) {
-        match self {
-            Direction::Up => (0, -1),
-            Direction::Left => (-1, 0),
-            Direction::Right => (1, 0),
-            Direction::UpLeft => (-1, -1),
-            Direction::UpRight => (1, -1),
-            Direction::Down => (0, 1),
-            Direction::DownLeft => (-1, 1),
-            Direction::DownRight => (1, 1),
-        }
-    }
-
     // Return a list of directions where Down is always the first element, then DownLeft and DownRight randomly
     pub fn down_directions<R: Rng>(rng: &mut R) -> &'static [Direction] {
         static DIRECTIONS: OnceLock<Vec<[Direction; 3]>> = OnceLock::new();
@@ -227,7 +214,7 @@ impl Pixel {
         ctrl: &Ctrl,
     ) -> Option<Direction> {
         match self.instance.pixel_type() {
-            PixelType::Liquid(_) | PixelType::Gas(_) => {
+            PixelType::Solid(_) | PixelType::Liquid(_) | PixelType::Gas(_) => {
                 let dirs = match self.velocity.0 {
                     x if x > 0 => &[Direction::Right, Direction::Left],
                     x if x < 0 => &[Direction::Left, Direction::Right],
@@ -391,6 +378,10 @@ impl Pixel {
         ctrl: &Ctrl,
         rng: &mut R,
     ) {
+        // movable rules are based on the pixel type
+        // 1. update velocity based on movable rules (liquid/solid)
+        // 2. move based on movable rules (all types)
+        // 3. move based on velocity (except gas)
     }
 
     fn tick_velocity_update<Ctrl: SandboxControl, R: Rng>(
@@ -399,9 +390,8 @@ impl Pixel {
         ctrl: &Ctrl,
         rng: &mut R,
     ) {
-        // update velocity based on moveable directions
-        //  => down, downLeft, downRight -> update gravity
-        //  => otherwise transfer down velocity to horizontal velocity
+        // update velocity based on movable rules (liquid/solid)
+        // reset velocity if it can't move
         match self.instance.pixel_type() {
             PixelType::Solid(_) | PixelType::Liquid(_) => {
                 let dir = self.can_move_down(cord, rng, ctrl);
@@ -415,6 +405,7 @@ impl Pixel {
                         self.update_velocity_x(self.velocity.0 + GRAVITY/2);
                         self.update_velocity_y(self.velocity.1 + GRAVITY/2);
                     },
+                    // TODO only if it hit the wall or end
                     None => self.velocity_y_to_x(cord, rng, ctrl),
                     Some(_) => unreachable!("self.can_move_down shouldn't return other than Down, DownLeft, DownRight, or None"),
                 }
