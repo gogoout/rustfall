@@ -20,6 +20,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;
 
 const GRAVITY: i16 = 15;
+const HORIZONTAL_SPEED: i16 = 1000;
 const MAX_VELOCITY: i16 = 5000;
 const MIX_VELOCITY: i16 = -5000;
 
@@ -139,6 +140,30 @@ impl Pixel {
         self.is_moved = flag;
     }
 
+    fn can_swap_with(&self, target: &Pixel) -> bool {
+        let density: Option<i8> = self.instance.pixel_type().density();
+        let Some(density) = density else {
+            return false;
+        };
+        if target.is_moved() {
+            return false;
+        }
+        let reverse = density < 0;
+
+        match target.instance.pixel_type() {
+            PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
+                match (density == td, density > td, reverse) {
+                    (true, _, _) => false,
+                    (false, true, false) => true,
+                    (false, false, true) => true,
+                    _ => false,
+                }
+            }
+            PixelType::Wall => false,
+            PixelType::Void => true,
+        }
+    }
+
     fn can_move_to_dir<Ctrl: SandboxControl>(
         &self,
         cord: Coordinate,
@@ -146,28 +171,12 @@ impl Pixel {
         ctrl: &Ctrl,
     ) -> bool {
         let density: Option<i8> = self.instance.pixel_type().density();
-        let Some(density) = density else{
+        let Some(density) = density else {
             return false;
         };
-        let reverse = density < 0;
 
         ctrl.get_neighbour_pixel(cord, dir)
-            .and_then(|(new_cord, p)| match p.is_moved() {
-                true => None,
-                false => Some(p.instance.pixel_type()),
-            })
-            .map_or(false, |p| match p {
-                PixelType::Solid(td) | PixelType::Gas(td) | PixelType::Liquid(td) => {
-                    match (density == td, density > td, reverse) {
-                        (true, _, _) => false,
-                        (false, true, false) => true,
-                        (false, false, true) => true,
-                        _ => false,
-                    }
-                }
-                PixelType::Wall => false,
-                PixelType::Void => true,
-            })
+            .map_or(false, |(_, p)| self.can_swap_with(p))
     }
 
     fn can_move_up<R: Rng, Ctrl: SandboxControl>(
@@ -229,15 +238,6 @@ impl Pixel {
         }
     }
 
-    fn update_velocity(&mut self, velocity: (i16, i16)) {
-        let (x, y) = velocity;
-
-        self.velocity = (
-            x.min(MIX_VELOCITY).max(MAX_VELOCITY),
-            y.min(MIX_VELOCITY).max(MAX_VELOCITY),
-        );
-    }
-
     fn update_velocity_x(&mut self, vx: i16) {
         self.velocity.0 = vx.min(MIX_VELOCITY).max(MAX_VELOCITY);
     }
@@ -246,8 +246,29 @@ impl Pixel {
         self.velocity.1 = vy.min(MIX_VELOCITY).max(MAX_VELOCITY);
     }
 
-    fn update_velocity_with_gravity(&mut self) {
-        self.update_velocity_y(self.velocity.1 + GRAVITY);
+    fn update_velocity_by_direction(&mut self, dir: Direction) {
+        match dir {
+            Direction::Up => {}
+            Direction::UpLeft => {}
+            Direction::UpRight => {}
+            Direction::Down => {
+                self.update_velocity_y(self.velocity.1 + GRAVITY);
+            }
+            Direction::DownLeft => {
+                self.update_velocity_x(self.velocity.0 - GRAVITY / 2);
+                self.update_velocity_y(self.velocity.1 + GRAVITY / 2);
+            }
+            Direction::DownRight => {
+                self.update_velocity_x(self.velocity.0 + GRAVITY / 2);
+                self.update_velocity_y(self.velocity.1 + GRAVITY / 2);
+            }
+            Direction::Left => {
+                self.update_velocity_x(self.velocity.0.min(0 - HORIZONTAL_SPEED));
+            }
+            Direction::Right => {
+                self.update_velocity_x(self.velocity.0.max(HORIZONTAL_SPEED));
+            }
+        }
     }
 
     fn update_velocity_with_friction(&mut self, friction: i16) {
@@ -339,26 +360,23 @@ impl Pixel {
 
         bresenham.any(|point| {
             let current = Self::point_to_coordinate(point);
-
-            let is_collied = {
-                let current_pixel = ctrl.get_pixel(current);
-
-                match current_pixel {
-                    Some(pixel) => pixel.instance.pixel_type() != PixelType::Void,
-                    None => false,
+            let current_pixel = ctrl.get_pixel(current);
+            match current_pixel {
+                Some(pixel) => {
+                    let is_collied = pixel.instance.pixel_type() != PixelType::Void;
+                    match is_collied {
+                        true => {
+                            collied_cord = Some(current);
+                            true
+                        }
+                        false => {
+                            last_cord = current;
+                            false
+                        }
+                    }
                 }
-            };
-
-            return match is_collied {
-                true => {
-                    collied_cord = Some(current);
-                    true
-                }
-                false => {
-                    last_cord = current;
-                    false
-                }
-            };
+                None => true,
+            }
         });
 
         (last_cord, collied_cord)
@@ -378,10 +396,27 @@ impl Pixel {
         ctrl: &Ctrl,
         rng: &mut R,
     ) {
-        // movable rules are based on the pixel type
-        // 1. update velocity based on movable rules (liquid/solid)
-        // 2. move based on movable rules (all types)
-        // 3. move based on velocity (except gas)
+        // We have 2 moving system here
+        // 1. basic rule based on the pixel type
+        // 2. velocity based movement
+        // These 2 systems have overlaps with each other
+        // With just basic rule system, we can't persistently move the pixel in one direction
+        // (eg. you see pixel move randomly left and right, because there's no status tracking that)
+        // With just velocity based movement, the collision rule is very complex and won't be perfect
+        // (eg. when pixel hit another, it may stop, align the speed, or bounce back). Also velocity system can't swap pixels
+        // And at the end of the day, this is just pixel physics,
+        // and we don't want to use density of the pixel to calculate velocity transition, because in real life, there's also rigid body involved.
+
+        // If we combined these 2 systems together
+        // update velocity based on movable rules (liquid/solid), then move just using the velocity system
+        // If the pixel is coiled with another pixel, and based on density rule, it can swap, we'd just swap these 2 pixel's position
+        // It won't be perfect, but in most case it might be ok?
+        // The reason gas is treated differently than others, is gas moves randomly, so we don't need velocity to persistent the movement
+
+        // 1. update velocity based on movable rules (except gas)
+        // 2a. move based on velocity (except gas)
+        // 3a. check collision and update velocity and swap pixel
+        // 2b. move based on movable rules (just gas)
     }
 
     fn tick_velocity_update<Ctrl: SandboxControl, R: Rng>(
@@ -393,81 +428,69 @@ impl Pixel {
         // update velocity based on movable rules (liquid/solid)
         // reset velocity if it can't move
         match self.instance.pixel_type() {
-            PixelType::Solid(_) | PixelType::Liquid(_) => {
+            PixelType::Solid(_) => {
                 let dir = self.can_move_down(cord, rng, ctrl);
                 match dir {
-                    Some(Direction::Down) => self.update_velocity_with_gravity(),
-                    Some(Direction::DownLeft) => {
-                        self.update_velocity_x(self.velocity.0 - GRAVITY/2);
-                        self.update_velocity_y(self.velocity.1 + GRAVITY/2);
-                    },
-                    Some(Direction::DownRight) => {
-                        self.update_velocity_x(self.velocity.0 + GRAVITY/2);
-                        self.update_velocity_y(self.velocity.1 + GRAVITY/2);
-                    },
-                    // TODO only if it hit the wall or end
+                    Some(dir) => self.update_velocity_by_direction(dir),
+                    // TODO only if it hit the wall or end? Maybe not actually
                     None => self.velocity_y_to_x(cord, rng, ctrl),
-                    Some(_) => unreachable!("self.can_move_down shouldn't return other than Down, DownLeft, DownRight, or None"),
                 }
             }
+            PixelType::Liquid(_) => {
+                let dir = self.can_move_down(cord, rng, ctrl);
+                match dir {
+                    Some(dir) => self.update_velocity_by_direction(dir),
+                    None if self.velocity.1 > 0 => self.velocity_y_to_x(cord, rng, ctrl),
+                    None => {
+                        let dir = self.can_move_horizontal(cord, rng, ctrl);
+                        match dir {
+                            Some(dir) => self.update_velocity_by_direction(dir),
+                            None => self.update_velocity_x(0),
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
-
-        // when collied with a lower density pixel
-        // remove current pixel's velocity (depending on the delta), and apply opposite velocity to the collided pixel
-        todo!()
     }
 
     fn tick_velocity_move<Ctrl: SandboxControl, R: Rng>(
-        &self,
+        &mut self,
         cord: Coordinate,
-        ctrl: &Ctrl,
+        ctrl: &mut Ctrl,
         rng: &mut R,
-    ) -> Option<Coordinate> {
+    ) {
         // calculating target coordinate based on velocity
         let target_cord = self.calculate_target_coordinate(cord);
         let (final_cord, collied_cord) = self.calculate_collied_coordinate(cord, target_cord, ctrl);
 
         // check if there's any collision
-        let collied_pixel = collied_cord.and_then(|cord| ctrl.get_pixel(cord));
-        let has_collied = collied_cord.is_some();
-        let hit_bottom = target_cord.1 == 0 && self.velocity.1 > 0;
-        let hit_left = target_cord.0 == 0 && self.velocity.0 < 0;
-        let hit_right = target_cord.0 == ctrl.width() - 1 && self.velocity.0 > 0;
+        let collied_pixel = collied_cord.and_then(|cord| ctrl.get_pixel_mut(cord));
+        let has_collied = target_cord != final_cord;
 
-        // TODO
-        // check movement rule and update velocity <- has to be first step otherwise it's not atomic, and may blocked by another pixel in the next run
-        // move based on velocity
-        // check collision and update velocity
-        // is above step going to conflict with each other?
+        let hit_top = has_collied && target_cord.1 == ctrl.height() - 1 && self.velocity.1 < 0;
+        let hit_bottom = has_collied && target_cord.1 == 0 && self.velocity.1 > 0;
+        let hit_left = has_collied && target_cord.0 == 0 && self.velocity.0 < 0;
+        let hit_right = has_collied && target_cord.0 == ctrl.width() - 1 && self.velocity.0 > 0;
 
-        // update velocity
-        // place the pixel at the point before colide
-        // then apply the normal rule to determine the velocity updates
-
-        // when collied with a horizontal higher density pixel
-        // check it's speed, if it's faster do nothing, if it's slower, update current pixel's velocity to match it
-        // if it's the opposite direction, reverse current pixel's velocity
-        // when collided with a vertical higher density pixel
-        // transfer current pixel's velocity to horizontal velocity
-        // when the colling pixel has both horizontal and vertical delta, pick the one with the highest delta and apply above rules
-
-        // when collied with a lower density pixel
-        // remove current pixel's velocity (depending on the delta), and apply opposite velocity to the collided pixel
-        todo!()
-
-        //
-        // match self.pixel_type() {
-        //     PixelType::Solid(density) => Direction::solid_directions(rng)
-        //         .iter()
-        //         .find_map(|dir| check_density(density, *dir, false)),
-        //     PixelType::Liquid(density) => Direction::liquid_directions(rng)
-        //         .iter()
-        //         .find_map(|dir| check_density(density, *dir, false)),
-        //     PixelType::Gas(density) => Direction::gas_directions(rng)
-        //         .iter()
-        //         .find_map(|dir| check_density(density, *dir, true)),
-        //     PixelType::Wall | PixelType::Void => None,
-        // }
+        match collied_pixel {
+            Some(pixel) if self.can_swap_with(pixel) => {
+                // TODO below won't work, as we are hold mutable ref to self and collied_pixel
+                // so we can't swap pixels here, the scope needs to be smaller, maybe put this in the control
+                ctrl.swap_pixels(final_cord, collied_cord.unwrap());
+                ctrl.swap_pixels(cord, collied_cord.unwrap());
+                self.mark_is_moved(true);
+                pixel.mark_is_moved(true);
+                // TODO update reverse velocity to swapped pixel
+            }
+            Some(pixel) => {
+                ctrl.swap_pixels(cord, final_cord);
+                // TODO update self velocity to the collied pixel's if density met
+            }
+            None => {
+                // TODO check hit edge and update velocity, actually not needed as this is handled in tick_velocity_update
+            }
+        }
     }
 }
 
